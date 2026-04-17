@@ -3,8 +3,19 @@
         "name": "Akin Gundogdu",
         "job": "Senior Full Stack Software Engineer",
         "summary": "With 10+ years of experience, I'm a Software Engineer who loves building scalable, high-performance systems and driving innovation through modern technologies. I specialize in quickly delivering high-quality web and mobile applications by leveraging AI throughout the development process. I enjoy collaborating across teams and taking ownership of complex projects that push boundaries.",
-        "cv_file_name": "akin_gundogdu_cv.pdf"
+        "cv_file_name": "akin_gundogdu_cv.pdf",
+        "email": "info@akingundogdu.com"
     },
+    "technologies": [
+        { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails" },
+        { "name": "Node.js", "icon": "simple-icons:nodedotjs" },
+        { "name": "Nest.js", "icon": "simple-icons:nestjs" },
+        { "name": "TypeScript", "icon": "simple-icons:typescript" },
+        { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss" },
+        { "name": "PostgreSQL", "icon": "simple-icons:postgresql" },
+        { "name": "Redis", "icon": "simple-icons:redis" },
+        { "name": "AWS", "icon": "simple-icons:amazonwebservices" }
+    ],
     "experiences": [
         {
             "title": "Senior Full Stack Software Engineer",
@@ -119,6 +130,14 @@
         {
             "iconName": "Linkedin",
             "link": "https://www.linkedin.com/in/akingundogdu"
+        },
+        {
+            "iconName": "Twitter",
+            "link": "https://twitter.com/akingundogdu"
+        },
+        {
+            "iconName": "Instagram",
+            "link": "https://instagram.com/akingundogdu"
         }
     ]
 }

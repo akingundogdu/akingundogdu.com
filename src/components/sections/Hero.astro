@@ -1,7 +1,8 @@
 ---
 import { Image } from 'astro:assets';
+import { Icon } from 'astro-icon/components';
 import heroImage from '../../assets/profile.png';
-import { basic } from '../../config/cv.json';
+import { basic, socialLinks, technologies } from '../../config/cv.json';
 ---
 
 <section class="py-5 px-4 sm:py-10 lg:py-16">
@@ -26,14 +27,51 @@ import { basic } from '../../config/cv.json';
                     {basic?.summary}
                 </p>
 
-                <div class="mt-10 sm:flex sm:items-center sm:space-x-8">
-                    <a href=`/cv/${basic?.cv_file_name}` title="Download CV" download
+                <div class="mt-10 flex flex-wrap items-center gap-4">
+                    <a href={`/cv/${basic?.cv_file_name}`} title="Download CV" download
                         class="inline-flex items-center justify-center px-10 py-4 text-base text-white
                             font-semibold transition-all duration-200 rounded
                             bg-primary hover:bg-secondary focus:bg-secondary" role="button">
                         Download CV
                     </a>
+
+                    {basic?.email && (
+                        <a href={`mailto:${basic.email}`} title="Hire me"
+                            class="inline-flex items-center justify-center px-10 py-4 text-base
+                                font-semibold transition-all duration-200 rounded
+                                border border-primary text-primary
+                                hover:bg-primary hover:text-white
+                                focus:bg-primary focus:text-white" role="button">
+                            Hire me
+                        </a>
+                    )}
                 </div>
+
+                {socialLinks?.length > 0 && (
+                    <ul class="mt-8 flex items-center gap-6">
+                        {socialLinks.map(social => (
+                            <li>
+                                <a href={social.link} title={social.iconName} target="_blank" rel="noopener noreferrer"
+                                   class="block text-default transition-all duration-300 hover:text-primary focus:text-primary">
+                                    <Icon name={social.iconName} class="w-6 h-6" />
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                {technologies?.length > 0 && (
+                    <div class="mt-8">
+                        <p class="text-sm text-offset mb-3 uppercase tracking-wide">Tech stack</p>
+                        <ul class="flex flex-wrap items-center gap-5">
+                            {technologies.map(tech => (
+                                <li title={tech.name} class="text-default/80 hover:text-primary transition-colors duration-200">
+                                    <Icon name={tech.icon} class="w-8 h-8" />
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </div>
         </div>
     </div>
