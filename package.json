@@ -1,0 +1,34 @@
+{
+  "name": "akingundogdu.com",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  },
+  "dependencies": {
+    "@astrojs/check": "0.9.4",
+    "@astrojs/mdx": "4.1.0",
+    "@astrojs/sitemap": "^3.2.1",
+    "@astrojs/tailwind": "6.0.0",
+    "astro": "5.4.1",
+    "astro-icon": "^1.1.1",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.15"
+  }
+}
