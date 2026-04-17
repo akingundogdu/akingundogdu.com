@@ -1,6 +1,6 @@
 ---
 import { Image } from 'astro:assets';
-import heroImage from '../../assets/paul_smith.png';
+import heroImage from '../../assets/profile.png';
 import { basic } from '../../config/cv.json';
 ---
 
@@ -11,7 +11,7 @@ import { basic } from '../../config/cv.json';
                 <Image class="w-full md:max-w-md lg:max-w-md"
                     src={heroImage}
                     loading="eager"
-                    alt="Astro Resume Theme - Paul Smith" />
+                    alt={`${basic?.name} - ${basic?.job}`} />
             </div>
             <div>
                 <p class="text-lg text-offset">

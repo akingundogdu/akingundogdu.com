@@ -1,62 +1,152 @@
 {
     "basic": {
-        "name": "Paul Smith",
-        "job": "Software Engineer",
-        "summary": "Transforming challenges into opportunities with cutting-edge technology. Driven by a love for elegant, robust code.",
-        "cv_file_name": "paul_cv.pdf"
+        "name": "Akin Gundogdu",
+        "job": "Senior Full Stack Software Engineer",
+        "summary": "Senior Full Stack Software Engineer & Product Engineer with 17+ years of experience building scalable web, mobile, and cloud products. Passionate about AI, indie making, elegant architectures, and shipping fast with quality.",
+        "cv_file_name": "akin_gundogdu_cv.pdf"
     },
     "experiences": [
         {
-            "title": "Senior Software Engineer",
-            "sub_title": "Tech Solutions Inc.",
-            "years": "2021 - Present",
-            "details": "Led the development of a scalable e-commerce platform that increased sales by 30%. Worked with modern technologies including React, Node.js, and AWS."
+            "title": "Senior Full Stack Software Engineer",
+            "sub_title": "Kajabi · Irvine, California (Remote)",
+            "years": "Mar 2023 - Present",
+            "details": "Backend engineer on the mobile team at Kajabi, the all-in-one platform powering 50,000+ knowledge entrepreneurs across 120 countries and $4B+ in sales. Delivering greenfield and iterative work across a complex, highly interconnected backend; contributing to iOS/Android code areas when needed. Since 2025 heavily invested in AI-assisted workflows — rule sets, prompt engineering, and experimenting with new techniques across the product."
+        },
+        {
+            "title": "Engineering Manager / Lead Full Stack Software Engineer",
+            "sub_title": "Superpeer · San Francisco, California (Remote)",
+            "years": "Dec 2020 - Mar 2023",
+            "details": "Grew from Lead Engineer to Engineering Manager. Owned software architecture, provided technical support across the engineering org, and managed the full engineering team — planning, hiring, mentoring, and execution. Superpeer is an all-in-one video platform (livestreams, courses, 1:1 coaching, community, subscriptions)."
+        },
+        {
+            "title": "Chief Technology Officer",
+            "sub_title": "Smarthronline · Istanbul, Turkey",
+            "years": "Feb 2020 - Oct 2022",
+            "details": "Planned sprints, managed teams and defined software architecture for an online hiring platform connecting logistics candidates with employers. Led all engineering decisions across backend, frontend, and infrastructure."
+        },
+        {
+            "title": "Lead Fullstack Software Engineer",
+            "sub_title": "Epigra · London, United Kingdom",
+            "years": "Jun 2020 - Dec 2020",
+            "details": "Planned sprints, managed teams and converted existing SaaS projects to a DDD-based architecture for an outsourcing studio that has shipped 100+ products over 13 years."
+        },
+        {
+            "title": "Lead Fullstack Software Engineer",
+            "sub_title": "Global Investment & Trading · London, United Kingdom",
+            "years": "Aug 2019 - Jun 2020",
+            "details": "Built real-time trading and charting features for a platform used by 30M+ traders and investors. Implemented business logic and UIs with PHP Laravel/Lumen and Vue, streaming real-time market data from financial sources (BoE) into trading charts."
+        },
+        {
+            "title": "Chief Technology Officer",
+            "sub_title": "MyNextMatch · London, United Kingdom",
+            "years": "Dec 2016 - Jul 2019",
+            "details": "Built the engineering team from scratch and designed a microservices architecture of 258 services handling 50M+ requests/day for a sports platform connecting athletes, clubs, sponsors, officials and fans. Shipped web, native iOS (285 views, Swift), CRM, event manager, Medicard health passport and social platform products."
+        },
+        {
+            "title": "iOS Developer",
+            "sub_title": "Drinki · York, United Kingdom",
+            "years": "Jul 2016 - Oct 2016",
+            "details": "Rebranded an existing iOS app — built a new Swift version, refactored legacy Objective-C, designed custom UI elements and integrated 3rd-party services (Maps, SMS API). UI designed in Sketch and Adobe Experience Designer."
         },
         {
             "title": "Software Engineer",
-            "sub_title": "Innovate Labs",
-            "years": "2018 - 2021",
-            "details": "Developed and maintained web applications for various clients. Key contributor in migrating legacy systems to cloud infrastructure."
+            "sub_title": "JTI (Japan Tobacco International) · Izmir, Turkey",
+            "years": "Apr 2014 - Aug 2016",
+            "details": "Delivered multiple internal projects as a full-stack engineer. Database design, architecture, code reviews and deployments across microservices and monoliths. Stack: ASP.NET MVC (C#), MSSQL, TFS/VSTS, Redis, Azure; Angular.js, TypeScript, jQuery, Sencha, DevExpress, Cordova."
         },
         {
-            "title": "Junior Developer",
-            "sub_title": "Creative Apps Studio",
-            "years": "2015 - 2018",
-            "details": "Worked on mobile app development, collaborating with design teams to create user-friendly applications."
+            "title": "Software Engineer",
+            "sub_title": "Agrasya Interwork · Izmir, Turkey",
+            "years": "Mar 2014 - Oct 2016",
+            "details": "Built the full order-to-delivery web platform for a specialty animal-feed producer, including the proprietary formulation algorithms. System still running in production."
+        },
+        {
+            "title": "iOS App Developer",
+            "sub_title": "FYZOO · Izmir, Turkey",
+            "years": "Mar 2016 - Jun 2016",
+            "details": "Native iOS app for a zoo center built in Swift, with Firebase for data and push notifications."
+        },
+        {
+            "title": "Mid Level Software Engineer",
+            "sub_title": "Narkonteks Tekstil (Blackspade) · Izmir, Turkey",
+            "years": "Dec 2011 - Mar 2014",
+            "details": "Refactored legacy apps to Angular.js for web and mobile, managed code reviews and deployments, and contributed to the CRM with SAP module integration."
+        },
+        {
+            "title": "Junior Software Engineer",
+            "sub_title": "Shift Technic - MSE Computer and Software · Izmir, Turkey",
+            "years": "Jul 2010 - Jun 2011",
+            "details": "Early-career software engineering role delivering custom software solutions."
+        },
+        {
+            "title": "Junior Software Engineer",
+            "sub_title": "Dokuz Eylul University · Izmir, Turkey",
+            "years": "Oct 2009 - Jul 2010",
+            "details": "Engineering role at Dokuz Eylul University contributing to internal software projects."
+        },
+        {
+            "title": "Junior Software Engineer",
+            "sub_title": "Nisa Ajans · Izmir, Turkey",
+            "years": "Mar 2008 - Jul 2009",
+            "details": "First professional engineering role, working across a range of client software projects."
         }
     ],
     "education": [
         {
-            "title": "Bachelor of Science in Computer Science",
-            "sub_title": "University of Modern Tech",
-            "years": "2015 - 2019",
-            "details": "Graduated with honors. Specialized in software development, data structures, and algorithms. Worked on various open-source projects and completed internships in tech companies."
+            "title": "Computer Engineering",
+            "sub_title": "Dokuz Eylul University · Izmir, Turkey",
+            "years": "2010 - 2014",
+            "details": "Graduated from Dokuz Eylul University in Alsancak, Izmir, with a focus on software engineering, algorithms and data structures."
         },
         {
-            "title": "Master of Science in Software Engineering",
-            "sub_title": "Global Tech Institute",
-            "years": "2019 - 2021",
-            "details": "Focused on advanced algorithms, cloud computing, and full-stack development. Published research papers on scalable microservices architecture."
+            "title": "Developing ASP.NET MVC Web Applications (MCSD)",
+            "sub_title": "Microsoft Certified Solutions Developer",
+            "years": "Issued Sep 2014",
+            "details": "Microsoft certification covering ASP.NET MVC, C#, Web API, and modern .NET web application development practices."
+        },
+        {
+            "title": "Developing Microsoft Azure and Web Services (MCSD)",
+            "sub_title": "Microsoft Certified Solutions Developer",
+            "years": "Issued Sep 2014",
+            "details": "Microsoft certification covering Azure cloud services, WCF, Web API and scalable web service design."
         }
     ],
     "projects": [
         {
-            "imageUrl": "https://images.unsplash.com/photo-1487017159836-4e23ece2e4cf?q=80&w=764&auto=format&fit=crop",
-            "title": "hello.com",
-            "type": "Website",
-            "link": "https://github.com/wasutz/astro-resume-theme"
+            "imageUrl": "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=764&auto=format&fit=crop",
+            "title": "Superpeer",
+            "type": "Video Platform",
+            "link": "https://superpeer.com"
         },
         {
-            "imageUrl": "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?q=80&w=764&auto=format&fit=crop",
-            "title": "Paul UI kit collections",
-            "type": "UI Kit",
-            "link": "https://github.com/wasutz/astro-resume-theme"
+            "imageUrl": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=764&auto=format&fit=crop",
+            "title": "MyNextMatch iOS",
+            "type": "Mobile App",
+            "link": "https://itunes.apple.com/app/mynextmatch/id1309610782"
         },
         {
-            "imageUrl": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=764&auto=format&fit=crop",
-            "title": "paul.com",
-            "type": "Website",
-            "link": "https://github.com/wasutz/astro-resume-theme"
+            "imageUrl": "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?q=80&w=764&auto=format&fit=crop",
+            "title": "MyNextMatch Platform",
+            "type": "Sports Social Network",
+            "link": "https://www.mynextmatch.com"
+        },
+        {
+            "imageUrl": "https://images.unsplash.com/photo-1489533119213-66a5cd877091?q=80&w=764&auto=format&fit=crop",
+            "title": "SQL Code Bank",
+            "type": "Knowledge Base",
+            "link": "https://sqlcodebank.com"
+        },
+        {
+            "imageUrl": "https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?q=80&w=764&auto=format&fit=crop",
+            "title": "Medicard",
+            "type": "Digital Health Passport",
+            "link": "https://www.mynextmatch.com"
+        },
+        {
+            "imageUrl": "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=764&auto=format&fit=crop",
+            "title": "Event Manager",
+            "type": "Sports Event Platform",
+            "link": "https://www.mynextmatch.com"
         }
     ],
     "menuItems": [
@@ -72,15 +162,11 @@
     "socialLinks": [
         {
             "iconName": "Github",
-            "link": "https://github.com/wasutz/astro-resume-theme"
+            "link": "https://github.com/akingundogdu"
         },
         {
-            "iconName": "Facebook",
-            "link": "https://facebook.com"
-        },
-        {
-            "iconName": "Instagram",
-            "link": "https://instagram.com"
+            "iconName": "Linkedin",
+            "link": "https://www.linkedin.com/in/akingundogdu"
         }
     ]
 }
