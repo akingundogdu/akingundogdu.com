@@ -30,16 +30,8 @@ const {Content} = await blog.render();
 
 <Layout title={blog.data.title}>
     <section class="flex justify-center mt-12">
-        <div id="markdown" class="prose prose-lg overflow-visible relative mb-5">
+        <div id="markdown" class="prose prose-invert prose-lg overflow-visible relative mb-5">
             <Content />
         </div>
     </section>
-
-    <script>
-        import { toggleMarkdownTheme } from "../../scripts/theme";
-
-        const theme = document.documentElement.dataset.theme;
-
-        toggleMarkdownTheme(theme)
-    </script>
 </Layout>

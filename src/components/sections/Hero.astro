@@ -2,14 +2,14 @@
 import { Image } from 'astro:assets';
 import { Icon } from 'astro-icon/components';
 import heroImage from '../../assets/profile.png';
-import { basic, socialLinks, technologies } from '../../config/cv.json';
+import { basic, socialLinks, technologyStack } from '../../config/cv.json';
 ---
 
 <section class="py-5 px-4 sm:py-10 lg:py-16">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <div class="grid items-center grid-cols-1 gap-12 lg:grid-cols-2">
             <div class="relative flex justify-center">
-                <Image class="w-full md:max-w-md lg:max-w-md"
+                <Image class="w-1/2 max-w-[180px] sm:w-full sm:max-w-xs md:max-w-md lg:max-w-md"
                     src={heroImage}
                     loading="eager"
                     alt={`${basic?.name} - ${basic?.job}`} />
@@ -28,23 +28,29 @@ import { basic, socialLinks, technologies } from '../../config/cv.json';
                 </p>
 
                 <div class="mt-10 flex flex-wrap items-center gap-4">
-                    <a href={`/cv/${basic?.cv_file_name}`} title="Download CV" download
-                        class="inline-flex items-center justify-center px-10 py-4 text-base text-white
-                            font-semibold transition-all duration-200 rounded
-                            bg-primary hover:bg-secondary focus:bg-secondary" role="button">
-                        Download CV
-                    </a>
-
                     {basic?.email && (
                         <a href={`mailto:${basic.email}`} title="Hire me"
-                            class="inline-flex items-center justify-center px-10 py-4 text-base
+                            class="inline-flex items-center justify-center px-10 py-4 text-base text-white
                                 font-semibold transition-all duration-200 rounded
-                                border border-primary text-primary
-                                hover:bg-primary hover:text-white
-                                focus:bg-primary focus:text-white" role="button">
+                                bg-primary hover:bg-secondary focus:bg-secondary" role="button">
                             Hire me
                         </a>
                     )}
+
+                    <a
+                        href="https://calendly.com/akin-gundogdu-dev/let-s-meet-and-chat"
+                        title="Contact me"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center px-10 py-4 text-base
+                            font-semibold transition-all duration-200 rounded
+                            border border-primary text-primary
+                            hover:bg-primary hover:text-white
+                            focus:bg-primary focus:text-white"
+                        role="button"
+                    >
+                        Contact me
+                    </a>
                 </div>
 
                 {socialLinks?.length > 0 && (
@@ -60,16 +66,42 @@ import { basic, socialLinks, technologies } from '../../config/cv.json';
                     </ul>
                 )}
 
-                {technologies?.length > 0 && (
-                    <div class="mt-8">
-                        <p class="text-sm text-offset mb-3 uppercase tracking-wide">Tech stack</p>
-                        <ul class="flex flex-wrap items-center gap-5">
-                            {technologies.map(tech => (
-                                <li title={tech.name} class="text-default/80 hover:text-primary transition-colors duration-200">
-                                    <Icon name={tech.icon} class="w-8 h-8" />
-                                </li>
-                            ))}
-                        </ul>
+                {technologyStack?.length > 0 && (
+                    <div class="mt-6 space-y-3">
+                        <p class="text-xs text-offset uppercase tracking-wide">Tech stack</p>
+                        {technologyStack.map((section) => (
+                            <div>
+                                <p class="text-[10px] font-semibold text-primary/90 mb-1 uppercase tracking-wider">
+                                    {section.category}
+                                </p>
+                                <ul class="flex flex-wrap items-start gap-1.5">
+                                    {section.items.map((tech) => (
+                                        <li>
+                                            <a
+                                                href={tech.link}
+                                                title={tech.name}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="group flex flex-col items-center gap-0.5 rounded-md
+                                                       bg-background/60 px-1.5 py-1 min-w-[3.75rem] max-w-[4.75rem]
+                                                       text-offset transition-colors duration-200
+                                                       hover:text-primary
+                                                       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                            >
+                                                <Icon
+                                                    name={tech.icon}
+                                                    class="h-4 w-4 shrink-0 text-current"
+                                                    aria-hidden="true"
+                                                />
+                                                <span class="text-center text-[9px] font-medium leading-tight text-current">
+                                                    {tech.name}
+                                                </span>
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

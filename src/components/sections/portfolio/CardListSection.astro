@@ -1,11 +1,22 @@
 ---
 import CardListItem from './CardListItem.astro';
 
+interface Tech {
+  name: string;
+  icon: string;
+  link: string;
+}
+
 interface Item {
   title: string;
   sub_title: string;
   years: string;
   details?: string;
+  bullets?: string[];
+  company_link?: string;
+  company_icon?: string;
+  company_logo_url?: string;
+  technologies?: Tech[];
 }
 
 const { title, items } = Astro.props;
@@ -24,6 +35,11 @@ const { title, items } = Astro.props;
           sub_title={item.sub_title}
           years={item.years}
           details={item?.details}
+          bullets={item?.bullets}
+          company_link={item?.company_link}
+          company_icon={item?.company_icon}
+          company_logo_url={item?.company_logo_url}
+          technologies={item?.technologies}
         />
       ))}
     </ul>

@@ -1,15 +1,27 @@
 ---
-import type { Blog } from '../../../types/BlogType';
+import type { CollectionEntry } from 'astro:content';
 import BlogItem from './BlogItem.astro';
 
-const { blogs } = Astro.props;
+interface Props {
+  blogs: CollectionEntry<'blogs'>[];
+  title?: string;
+  description?: string;
+}
+
+const { blogs, title = 'Recent posts', description } = Astro.props;
 ---
 
 <section class="py-12 bg-background">
-  <div class="container mx-auto px-4 max-w-4xl">
-    <h1 class="text-center text-3xl mb-10">Recent posts</h1>
-    <div class="space-y-6">
-      {blogs.map((blog: Blog, index: number) => (
+  <div class="container mx-auto px-6 max-w-4xl">
+    <h1 class="text-3xl font-semibold text-center capitalize lg:text-4xl">
+      {title}
+    </h1>
+    {description && (
+      <p class="mt-4 text-center text-offset">{description}</p>
+    )}
+
+    <div class={`space-y-6 ${description ? 'mt-8' : 'mt-10'}`}>
+      {blogs.map((blog, index) => (
         <BlogItem blog={blog} isFirst={index === 0} />
       ))}
     </div>

@@ -2,82 +2,248 @@
     "basic": {
         "name": "Akin Gundogdu",
         "job": "Senior Full Stack Software Engineer",
-        "summary": "With 10+ years of experience, I'm a Software Engineer who loves building scalable, high-performance systems and driving innovation through modern technologies. I specialize in quickly delivering high-quality web and mobile applications by leveraging AI throughout the development process. I enjoy collaborating across teams and taking ownership of complex projects that push boundaries.",
+        "summary": "With 10+ years of experience, I'm a Software Engineer who loves building scalable, high-performance systems and driving innovation through modern technologies. I have designed and built systems that reliably handle billions of requests. I specialize in backend heavy fullstack development, building scalable APIs and services while delivering high-quality web applications. I have the capability to produce quality, production-ready applications by correctly using and properly orchestrating AI tools. I enjoy collaborating across teams and taking ownership of complex projects that push boundaries.",
         "cv_file_name": "akin_gundogdu_cv.pdf",
         "email": "info@akingundogdu.com"
     },
-    "technologies": [
-        { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails" },
-        { "name": "Node.js", "icon": "simple-icons:nodedotjs" },
-        { "name": "Nest.js", "icon": "simple-icons:nestjs" },
-        { "name": "TypeScript", "icon": "simple-icons:typescript" },
-        { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss" },
-        { "name": "PostgreSQL", "icon": "simple-icons:postgresql" },
-        { "name": "Redis", "icon": "simple-icons:redis" },
-        { "name": "AWS", "icon": "simple-icons:amazonwebservices" }
+    "technologyStack": [
+        {
+            "category": "Backend",
+            "items": [
+                { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "Node.js", "icon": "simple-icons:nodedotjs", "link": "https://nodejs.org" },
+                { "name": "Python", "icon": "simple-icons:python", "link": "https://www.python.org" },
+                { "name": "Django", "icon": "simple-icons:django", "link": "https://www.djangoproject.com" },
+                { "name": "GraphQL", "icon": "simple-icons:graphql", "link": "https://graphql.org" },
+                { "name": "Prisma", "icon": "simple-icons:prisma", "link": "https://www.prisma.io" },
+                { "name": "TypeORM", "icon": "simple-icons:typeorm", "link": "https://typeorm.io" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "MySQL", "icon": "simple-icons:mysql", "link": "https://www.mysql.com" },
+                { "name": "MongoDB", "icon": "simple-icons:mongodb", "link": "https://www.mongodb.com" },
+                { "name": "Firestore", "icon": "simple-icons:firebase", "link": "https://firebase.google.com/products/firestore" }
+            ]
+        },
+        {
+            "category": "Frontend",
+            "items": [
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" },
+                { "name": "shadcn/ui", "icon": "simple-icons:shadcnui", "link": "https://ui.shadcn.com" },
+                { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss", "link": "https://tailwindcss.com" },
+                { "name": "Atomic CSS", "icon": "simple-icons:css3", "link": "https://css-tricks.com/lets-define-exactly-atomic-css/" },
+                { "name": "DevExpress", "icon": "simple-icons:devexpress", "link": "https://www.devexpress.com" },
+                { "name": "Sencha", "icon": "simple-icons:sencha", "link": "https://www.sencha.com" },
+                { "name": "Kendo UI", "icon": "simple-icons:progress", "link": "https://www.telerik.com/kendo-ui" },
+                { "name": "React Native", "icon": "simple-icons:react", "link": "https://reactnative.dev" },
+                { "name": "TanStack Query", "icon": "simple-icons:reactquery", "link": "https://tanstack.com/query" },
+                { "name": "Zustand", "icon": "simple-icons:react", "link": "https://docs.pmnd.rs/zustand/getting-started/introduction" },
+                { "name": "Playwright", "icon": "simple-icons:playwright", "link": "https://playwright.dev" },
+                { "name": "Cypress", "icon": "simple-icons:cypress", "link": "https://www.cypress.io" },
+                { "name": "Vite", "icon": "simple-icons:vite", "link": "https://vite.dev" },
+                { "name": "Storybook", "icon": "simple-icons:storybook", "link": "https://storybook.js.org" }
+            ]
+        },
+        {
+            "category": "Production",
+            "items": [
+                { "name": "Redis", "icon": "simple-icons:redis", "link": "https://redis.io" },
+                { "name": "Memcached", "icon": "simple-icons:amazonelasticache", "link": "https://memcached.org/" },
+                { "name": "Apache Kafka", "icon": "simple-icons:apachekafka", "link": "https://kafka.apache.org/" },
+                { "name": "Sidekiq", "icon": "simple-icons:sidekiq", "link": "https://sidekiq.org/" },
+                { "name": "BullMQ", "icon": "simple-icons:redis", "link": "https://docs.bullmq.io/" },
+                { "name": "Elasticsearch", "icon": "simple-icons:elasticsearch", "link": "https://www.elastic.co/elasticsearch" },
+                { "name": "EC2", "icon": "simple-icons:amazonec2", "link": "https://aws.amazon.com/ec2/" },
+                { "name": "S3", "icon": "simple-icons:amazons3", "link": "https://aws.amazon.com/s3/" },
+                { "name": "CloudFront", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com/cloudfront/" },
+                { "name": "EKS", "icon": "simple-icons:amazoneks", "link": "https://aws.amazon.com/eks/" },
+                { "name": "ELB", "icon": "simple-icons:awselasticloadbalancing", "link": "https://aws.amazon.com/elasticloadbalancing/" },
+                { "name": "ECS", "icon": "simple-icons:amazonecs", "link": "https://aws.amazon.com/ecs/" },
+                { "name": "Lambda", "icon": "simple-icons:awslambda", "link": "https://aws.amazon.com/lambda/" },
+                { "name": "RDS", "icon": "simple-icons:amazonrds", "link": "https://aws.amazon.com/rds/" },
+                { "name": "SQS", "icon": "simple-icons:amazonsqs", "link": "https://aws.amazon.com/sqs/" },
+                { "name": "CloudWatch", "icon": "simple-icons:amazoncloudwatch", "link": "https://aws.amazon.com/cloudwatch/" },
+                { "name": "Fargate", "icon": "simple-icons:awsfargate", "link": "https://aws.amazon.com/fargate/" },
+                { "name": "RabbitMQ", "icon": "simple-icons:rabbitmq", "link": "https://www.rabbitmq.com" },
+                { "name": "NATS", "icon": "simple-icons:natsdotio", "link": "https://nats.io" },
+                { "name": "Amazon SNS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com/sns/" },
+                { "name": "Docker", "icon": "simple-icons:docker", "link": "https://www.docker.com" },
+                { "name": "Kubernetes", "icon": "simple-icons:kubernetes", "link": "https://kubernetes.io" },
+                { "name": "Terraform", "icon": "simple-icons:terraform", "link": "https://www.terraform.io" },
+                { "name": "AWS CDK", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com/cdk/" },
+                { "name": "GitHub Actions", "icon": "simple-icons:githubactions", "link": "https://github.com/features/actions" },
+                { "name": "CircleCI", "icon": "simple-icons:circleci", "link": "https://circleci.com" },
+                { "name": "Argo CD", "icon": "simple-icons:argo", "link": "https://argo-cd.readthedocs.io" },
+                { "name": "Cloudflare", "icon": "simple-icons:cloudflare", "link": "https://www.cloudflare.com" },
+                { "name": "Cloudflare Workers", "icon": "simple-icons:cloudflareworkers", "link": "https://workers.cloudflare.com" },
+                { "name": "NGINX", "icon": "simple-icons:nginx", "link": "https://nginx.org" },
+                { "name": "Envoy", "icon": "simple-icons:envoyproxy", "link": "https://www.envoyproxy.io" }
+            ]
+        },
+        {
+            "category": "Tools",
+            "items": [
+                { "name": "ClickHouse", "icon": "simple-icons:clickhouse", "link": "https://clickhouse.com/" },
+                { "name": "QlikView", "icon": "simple-icons:qlik", "link": "https://www.qlik.com/us/products/qlikview" },
+                { "name": "Grafana", "icon": "simple-icons:grafana", "link": "https://grafana.com/" },
+                { "name": "OpenTelemetry", "icon": "simple-icons:opentelemetry", "link": "https://opentelemetry.io/" },
+                { "name": "Datadog", "icon": "simple-icons:datadog", "link": "https://www.datadoghq.com/" },
+                { "name": "Sentry", "icon": "simple-icons:sentry", "link": "https://sentry.io" },
+                { "name": "Rollbar", "icon": "simple-icons:rollbar", "link": "https://rollbar.com" },
+                { "name": "Honeybadger", "icon": "simple-icons:honeybadger", "link": "https://www.honeybadger.io" },
+                { "name": "PostHog", "icon": "simple-icons:posthog", "link": "https://posthog.com" },
+                { "name": "Mixpanel", "icon": "simple-icons:mixpanel", "link": "https://mixpanel.com" },
+                { "name": "Amplitude", "icon": "simple-icons:googleanalytics", "link": "https://amplitude.com" },
+                { "name": "RudderStack", "icon": "simple-icons:apachekafka", "link": "https://www.rudderstack.com" },
+                { "name": "Figma", "icon": "simple-icons:figma", "link": "https://www.figma.com" },
+                { "name": "Mobbin", "icon": "simple-icons:dribbble", "link": "https://mobbin.com" },
+                { "name": "Google BigQuery", "icon": "simple-icons:googlebigquery", "link": "https://cloud.google.com/bigquery" },
+                { "name": "ElevenLabs", "icon": "simple-icons:elevenlabs", "link": "https://elevenlabs.io" },
+                { "name": "Postmark", "icon": "simple-icons:sparkpost", "link": "https://postmarkapp.com" },
+                { "name": "SendGrid", "icon": "simple-icons:sendgrid", "link": "https://sendgrid.com" },
+                { "name": "Mailchimp", "icon": "simple-icons:mailchimp", "link": "https://mailchimp.com" },
+                { "name": "Claude Code", "icon": "simple-icons:claude", "link": "https://www.anthropic.com/claude-code" },
+                { "name": "Cursor", "icon": "simple-icons:cursor", "link": "https://cursor.com" },
+                { "name": "Devin", "icon": "simple-icons:openai", "link": "https://devin.ai" },
+                { "name": "Okta", "icon": "simple-icons:okta", "link": "https://www.okta.com" },
+                { "name": "Stripe", "icon": "simple-icons:stripe", "link": "https://stripe.com" },
+                { "name": "Adapty", "icon": "simple-icons:revenuecat", "link": "https://adapty.io" },
+                { "name": "RevenueCat", "icon": "simple-icons:revenuecat", "link": "https://www.revenuecat.com" },
+                { "name": "iyzico", "icon": "simple-icons:paypal", "link": "https://www.iyzico.com" },
+                { "name": "Expo", "icon": "simple-icons:expo", "link": "https://expo.dev" },
+                { "name": "Jira", "icon": "simple-icons:jira", "link": "https://www.atlassian.com/software/jira" },
+                { "name": "Confluence", "icon": "simple-icons:confluence", "link": "https://www.atlassian.com/software/confluence" },
+                { "name": "Opsgenie", "icon": "simple-icons:opsgenie", "link": "https://www.atlassian.com/software/opsgenie" },
+                { "name": "Bitbucket", "icon": "simple-icons:bitbucket", "link": "https://bitbucket.org" },
+                { "name": "CodeRabbit", "icon": "simple-icons:coderabbit", "link": "https://coderabbit.ai" },
+                { "name": "SonarQube", "icon": "simple-icons:sonarqube", "link": "https://www.sonarsource.com/products/sonarqube/" },
+                { "name": "Postman", "icon": "simple-icons:postman", "link": "https://www.postman.com" },
+                { "name": "Slack", "icon": "simple-icons:slack", "link": "https://slack.com/" }
+            ]
+        }
     ],
     "experiences": [
         {
             "title": "Senior Full Stack Software Engineer",
             "sub_title": "Kajabi",
-            "years": "Mar 2023 - Present",
-            "details": "Cost optimization: Migrated AWS RDS PostgreSQL instances to Reserved Instances during a hackathon, saving $180k/month in infrastructure costs. Build workflow for BMA: Built an end-to-end GitHub Actions + Fastlane pipeline (Ruby on Rails + Python) that automatically builds and publishes branded mobile apps for ~5M customers to the App Store and Play Store — reducing operational costs by 48% and release time by 80%. Payment for BMA: Implemented native Apple/Google payment and subscription flows for branded mobile apps (Ruby on Rails, 6 months), driving a 34% increase in product usage and a 12% uplift in creator sales. App Builder Studio: Designed and shipped a React + TypeScript studio letting creators design their own branded apps, lifting user retention by 26% and generating $5M GMV in 6 months. AI tooling: Actively contributing to all Kajabi mobile apps using Cursor, Swift and React Native — shipping large features quickly across iOS and Android."
+            "years": "Mar 2023 - Jan 2026",
+            "company_link": "https://kajabi.com",
+            "company_icon": "Kajabi",
+            "technologies": [
+                { "name": "AWS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "GitHub Actions", "icon": "simple-icons:githubactions", "link": "https://github.com/features/actions" },
+                { "name": "Fastlane", "icon": "simple-icons:fastlane", "link": "https://fastlane.tools" },
+                { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
+                { "name": "Python", "icon": "simple-icons:python", "link": "https://www.python.org" },
+                { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" }
+            ],
+            "bullets": [
+                "Cost optimization: Optimized AWS RDS Aurora PostgreSQL instances using Reserved Instances during a hackathon event, achieving monthly infrastructure cost savings of $180,000.",
+                "Build workflow for BMA: Using GitHub Actions and Fastlane, developed an end-to-end build automation workflow using Ruby on Rails and Python that automatically builds and publishes mobile apps for nearly 5 million customers to Apple and Google app stores. This solution reduced operational costs by 48% and shortened the app release time by 80%.",
+                "Payment for BMA: Implemented native payment and subscription features via Apple and Google APIs for branded mobile apps, resulting in a 34% increase in product usage and a 12% uplift in sales for content creators after a 6-month complex backend development using Ruby on Rails.",
+                "Custom features for engagement: Designed and implemented an App Builder Studio using React.js and TypeScript for branded mobile apps, enabling users to independently design their own apps, boosting user retention rates by 26% and $5M GMV in 6 months."
+            ]
         },
         {
             "title": "Lead Full Stack Software Engineer",
             "sub_title": "Superpeer, Inc.",
-            "years": "Dec 2020 - Aug 2021",
-            "details": "High productivity: Analyzed competitors and delivered Course Management, 1:1 Meeting Infrastructure and Announcements in 2 months, driving a 17% revenue increase. Take ownership: Designed and rolled out a new full-stack architecture in 8 months, trained the whole team, improving engineering productivity by 30% and reducing production cost by 51%. Leadership: Led 4 engineers to ship every investment-critical web, backend and mobile item end-to-end — enabling a $2M funding round."
+            "years": "Dec 2020 - Mar 2023",
+            "company_link": "https://superpeer.com",
+            "company_logo_url": "https://media.licdn.com/dms/image/v2/C560BAQEv2HwulNsDbQ/company-logo_200_200/company-logo_200_200/0/1630618202137/superpeer_logo?e=1778112000&v=beta&t=q_3h_VvnSqB1iSZtyDl_FXR-FxqkZhJRSEvcoD02anM",
+            "technologies": [
+                { "name": "Node.js", "icon": "simple-icons:nodedotjs", "link": "https://nodejs.org" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "Vue.js", "icon": "simple-icons:vuedotjs", "link": "https://vuejs.org" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" }
+            ],
+            "bullets": [
+                "High productivity: Rapidly analyzed competitors and delivered major features—Course Management, 1:1 Meeting Infrastructure, and Announcements—in just 2 months, resulting in a 17% revenue increase.",
+                "Take ownership & responsibility: Designed and implemented a new full-stack architecture within 8 months, trained the entire team, improving engineering productivity by 30% and production cost by 51%.",
+                "Fostering belonging: Led a team of 4 engineers to deliver all investment-critical web, backend and mobile backlog items end-to-end, and the company raised $2M in funding as a result."
+            ]
         },
         {
-            "title": "Senior Full Stack Software Engineer",
+            "title": "Lead Full Stack Software Engineer",
             "sub_title": "Epigra",
-            "years": "Jun 2020 - Dec 2020",
-            "details": "Architecture modernization: Converted 231 existing client projects to a Domain-Driven Design architecture, establishing a scalable and maintainable foundation across the portfolio. ULive: Designed and built the ULive product from scratch with 3 engineers, securing $3M in investment within 6 months. Provided hands-on architecture guidance, PR reviews and defined coding standards to keep code quality and maintainability consistent across projects."
+            "years": "Jan 2020 - Dec 2020",
+            "company_link": "https://www.epigra.com",
+            "company_logo_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAA4VBMVEVHcEzeLDvgN0j+bS3vSzDdKTvhMTvfOUzqT0rXHEDMADz+bzHMADvhKCn0RBriLTL/bzD2RxP////OBTvuaWD3aUP0ak/mVV7nS03yblz+cTfVGUH8cT7tQizRBTbkPUXzRR3d4+XX293qQzncPlf3+PjzwL/7dEjjNTzgRVz6ThXtbmzqmZ7n7O37Zi/qSD/kxMHv8vPdLUP0ZzjfSWfaKkjTACvXDTbwW0rkLCzLl5LprKnygG7KgnzcOxLy5eXo1tTtdXbdcFHMxcTcWTvulI2rBA67Pjzw3NrQXVnoe4Z3HM7/AAAAEnRSTlMAa8WfUDuW/iMju9LlE+XRe71Hqd6XAAABZUlEQVQokY3S53KCQBiFYY0FTWIKVUSFVZZmA6TYe839X1C+RchgSSbv32fYw8xuJvPv8oVfqfDKqE+lh1R5ZhhG9bziAysCNSXPM1U1e0NZQk3J90xTpSgqfz3GMEEQhpJpmhQlG8Z7OTEy1gy6pOkXmGyMx+N4uizBic2AjtJkYnKVZROUpFAKYzQAOh02hb7vw5eTw+F47qwjEsUEffjBcEljo7peEyGWoO+7rivPaYw1jdU0bQ/E8zG6LiUIgmpjjJejJaanPFiMJVMgdbCDe6vRyXG6QDwXY2RV23Hmx7N4cuwdEJdgldTu9aaD0Uxc9TSO2DCFA8D9BW1Cw36M8gBqtJCtjMQZQlNd54b9BNukxgQhe9ZtIbTRdb2eYOapQVpsUQtCE06v1+u13M+VvQEqiwnYdj4k9JJ+LVmFtNhtIqqlLzt6JopiWZZO6OP+EVU+AYFy93SZtq7Hrsvfjv3RN8XxOePqL5JBAAAAAElFTkSuQmCC",
+            "technologies": [
+                { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
+                { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" }
+            ],
+            "bullets": [
+                "Architecture modernization: Converted all existing client projects (231) to a domain-driven design (DDD) architecture, creating a scalable and maintainable foundation across the portfolio.",
+                "ULive: Designed and built the ULive product from scratch with 3 engineers, enabling the company to secure $3M in investment within 6 months.",
+                "Technical leadership: Provided hands-on technical guidance on architecture and implementation decisions, helping keep code quality and structure consistent across projects.",
+                "Code quality & hiring: Reviewed pull requests and helped define coding standards to improve maintainability and reduce defects."
+            ]
         },
         {
             "title": "Senior Full Stack Software Engineer",
-            "sub_title": "Global Investment & Trading",
-            "years": "Aug 2019 - Jun 2020",
-            "details": "Real-time trading platform: Built core backend services, a real-time web trading dashboard and supporting mobile experiences for a global trading view and charting platform. Low-latency market data: Designed a high-throughput pipeline reliably handling 10M+ live market data requests, keeping chart updates smooth and delay-free. Reliability: Implemented unit and end-to-end tests and enforced solid code review practices to keep releases stable."
+            "sub_title": "My Next Match",
+            "years": "Aug 2016 - Oct 2019",
+            "company_link": "https://landing.mynextmatch.com/",
+            "company_logo_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEX/////+vzqlqbbMVjUADbUAjb97/PcOl7SACjTADLrm6rVADTQDTrOWmvLSl/KEjzKACrRACy+mqLDyMi5cX7DADK8pam+V2rW2trT09PGTGK8i5XJyMrBLky8Sl/c3t7l5eXCP1fRACLIkpzp6enGs7jDJUbv7+/39/f5+fn8/Py5anjFg5D31d3icYPIur7RAB334ebmhZnPkJraV3Drp7XvwMnSNlDQeonWJ0zby8/ZTmjcRGL9zHGFAAABTUlEQVR4Ab2TBXIDMQxFnaw2K4eZEztoaJjp/ueq7DJz/9Cb0TNbjMXiAUD4SgCCeIyxRISc6q8aHKMEi2P4TjDJAv6ewAMG4XsBYOH7+VAIf1Xg9/eRInwhpNKZLIcbzGWyeXgmpArFUqmMHivVUqlWgCcCFMr1RqPRLFAdW0TtDn8iFLp1IaVo9/qYH9TlUIpROvVI4OO2VForUR8V23WHQzFAuBdSlZFUxlpn1AUhs3pYv8I7AXAihppRtBoOlTZEVsnGmHvBb4Dq0xl9D2O0sQ6dMa+kvJDKNaSyCcTFjPksARcrZpQYcHACrqluNwWiravHIsL+jtE29twJhQPtKt73t7UkYea2z49Lpk+5FAmUrU7ym+uIdstVHzyel0s3qxdwcfcxef8BFws36j8+DHz0aQE++PbR+40TsSS+J7i7vbzXvBf2YftfAxjMKa7glB4mAAAAAElFTkSuQmCC",
+            "technologies": [
+                { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
+                { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "Docker", "icon": "simple-icons:docker", "link": "https://www.docker.com" },
+                { "name": "Kubernetes", "icon": "simple-icons:kubernetes", "link": "https://kubernetes.io" }
+            ],
+            "bullets": [
+                "Multi-platform product development: Worked as a core engineer across backend services, the main web application, and mobile apps, ensuring a consistent experience for all users.",
+                "Microservice architecture at scale: Designed and implemented a microservice-based architecture with 256 microservices running smoothly in production, enabling teams to ship features independently and scale safely.",
+                "End-to-end delivery & CI/CD: Contributed to roadmap and sprint planning, reviewed critical pull requests, and helped manage CI/CD pipelines to keep releases frequent and stable."
+            ]
         },
         {
-            "title": "Senior Full Stack Software Engineer",
-            "sub_title": "MyNextMatch",
-            "years": "Dec 2016 - Jul 2019",
-            "details": "Multi-platform product development: Core engineer across backend services, the main web application and mobile apps, ensuring a consistent experience for all users. Microservice architecture at scale: Designed and implemented a 256-service microservice architecture running smoothly in production, enabling teams to ship features independently and scale safely. Contributed to roadmap and sprint planning, reviewed critical pull requests and helped manage CI/CD pipelines to keep releases frequent and stable."
+            "title": "Full Stack Software Engineer",
+            "sub_title": "Siskon (JTI)",
+            "years": "Mar 2014 - Jun 2016",
+            "company_link": "https://www.jti.com",
+            "company_logo_url": "data:image/png;base64,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",
+            "technologies": [
+                { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
+                { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" }
+            ],
+            "bullets": [
+                "Internal systems development: Delivered multiple internal web applications for operations, sales, and reporting, from requirements through to production deployment.",
+                "Architecture & data design: Designed database schemas and implemented backend architecture for both microservice-style and monolithic solutions.",
+                "Full-stack delivery: Worked across client- and server-side rendered frontends, performed code reviews, and handled deployments to keep systems stable in production."
+            ]
         },
         {
             "title": "Software Engineer",
-            "sub_title": "JTI (Japan Tobacco International) - Siskon",
-            "years": "Apr 2014 - Dec 2016",
-            "details": "Internal systems: Delivered multiple internal web applications for operations, sales and reporting — from requirements through to production deployment. Architecture and data design: Designed database schemas and backend architecture for both microservice-style and monolithic solutions. Full-stack delivery: Worked across client- and server-rendered frontends, performed code reviews and handled deployments to keep systems stable in production."
-        },
-        {
-            "title": "Software Engineer",
-            "sub_title": "Narkonteks Tekstil A.Ş.",
-            "years": "Dec 2011 - Mar 2014",
-            "details": "Finance and stock systems migration: Migrated accounting and stock management processes out of SAP into in-house applications tailored to the company's workflows. Accounting and inventory domain expertise: Built deep hands-on experience in finance and inventory flows (invoicing, payments, stock movements, costing), aligning software with real-world business rules. Internal tools: Developed and maintained business and reporting tools used daily by finance and operations teams to track production, inventory and costs more accurately."
-        },
-        {
-            "title": "Mid Level Software Engineer",
-            "sub_title": "Shift Technic - MSE Computer and Software",
-            "years": "Jul 2010 - Jun 2011",
-            "details": "Full-stack web development: Worked as a full-stack engineer on in-house web applications, implementing both backend logic and user-facing features used across the company."
-        },
-        {
-            "title": "Junior Software Engineer",
-            "sub_title": "Nisa Ajans",
-            "years": "Mar 2008 - Jul 2009",
-            "details": "Order management systems: Worked as a full-stack engineer on print-house and order management software, helping digitize and streamline day-to-day order and production workflows."
+            "sub_title": "Narkonteks Tekstil A.Ş. (Blackspade)",
+            "years": "Feb 2013 - Mar 2014",
+            "company_logo_url": "data:image/png;base64,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",
+            "technologies": [
+                { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
+                { "name": "ASP.NET", "icon": "simple-icons:dotnet", "link": "https://dotnet.microsoft.com" },
+                { "name": "JavaScript", "icon": "simple-icons:javascript", "link": "https://developer.mozilla.org/en-US/docs/Web/JavaScript" },
+                { "name": "MySQL", "icon": "simple-icons:mysql", "link": "https://www.mysql.com" }
+            ],
+            "bullets": [
+                "Finance & stock systems migration: Worked on migrating accounting and stock management processes from SAP into in-house applications, replacing external systems with internal solutions tailored to the company's workflows.",
+                "Accounting & inventory domain expertise: Gained strong hands-on experience in finance and inventory flows (invoicing, payments, stock movements, costing), ensuring the software matched real-world business rules.",
+                "Internal tools for operations: Developed and maintained internal business and reporting tools used daily by finance and operations teams, helping them track production, inventory, and costs more accurately."
+            ]
         }
     ],
     "education": [
         {
             "title": "Computer Engineering",
-            "sub_title": "Dokuz Eylul University · Izmir, Turkey",
+            "sub_title": "Dokuz Eylul University · Turkey",
             "years": "2010 - 2014",
-            "details": "Undergraduate degree in Computer Engineering with a focus on software engineering, algorithms, data structures and distributed systems."
+            "details": "Undergraduate degree in Computer Engineering."
         }
     ],
     "projects": [
@@ -95,21 +261,15 @@
         },
         {
             "imageUrl": "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?q=80&w=764&auto=format&fit=crop",
-            "title": "MyNextMatch",
+            "title": "My Next Match",
             "type": "Sports Social Network",
-            "link": "https://www.mynextmatch.com"
+            "link": "https://landing.mynextmatch.com/"
         },
         {
             "imageUrl": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=764&auto=format&fit=crop",
-            "title": "MyNextMatch iOS",
+            "title": "My Next Match iOS",
             "type": "Mobile App",
             "link": "https://itunes.apple.com/app/mynextmatch/id1309610782"
-        },
-        {
-            "imageUrl": "https://images.unsplash.com/photo-1489533119213-66a5cd877091?q=80&w=764&auto=format&fit=crop",
-            "title": "SQL Code Bank",
-            "type": "Knowledge Base",
-            "link": "https://sqlcodebank.com"
         }
     ],
     "menuItems": [

@@ -1,12 +1,23 @@
 ---
+import { getCollection } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 import Hero from '../components/sections/Hero.astro';
 import Resume from '../components/sections/Resume.astro';
-import Portfolio from '../components/sections/portfolio/Portfolio.astro';
+import BlogList from '../components/sections/blog/BlogList.astro';
+
+const blogs = await getCollection('blogs');
+const sortedBlogs = blogs.sort(
+  (a, b) =>
+    new Date(b.data.datetime).getTime() - new Date(a.data.datetime).getTime()
+);
 ---
 
 <Layout title="Akin Gundogdu - Senior Full Stack Software Engineer">
 	<Hero />
 	<Resume />
-	<Portfolio />
+	<BlogList
+		blogs={sortedBlogs}
+		title="Blog"
+		description="Latest articles and technical writing."
+	/>
 </Layout>
