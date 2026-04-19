@@ -5,7 +5,7 @@ datetime: "2025-01-14"
 image: ""
 ---
 
-I've run all three of these in production at different scales. Kafka for a high-throughput order pipeline doing 200K events/second. RabbitMQ for a notification system that needed complex routing. NATS for internal service-to-service communication where latency mattered more than durability. Each choice was deliberate, and each came with trade-offs I didn't fully appreciate until things broke.
+I've run all three of these in production at different scales. Kafka for a high-throughput order pipeline doing 3M events/second. RabbitMQ for a notification system that needed complex routing. NATS for internal service-to-service communication where latency mattered more than durability. Each choice was deliberate, and each came with trade-offs I didn't fully appreciate until things broke.
 
 Here's what I've learned about picking and operating message brokers in event-driven architectures.
 
@@ -28,7 +28,7 @@ Kafka isn't really a message queue — it's a distributed, append-only log. This
 ### When I Reach for Kafka
 
 - Event streams that need replay (event sourcing, audit trails)
-- High throughput (100K+ messages/second)
+- High throughput (millions of messages/second)
 - Multiple consumers that need independent read positions
 - Data pipelines feeding analytics, search indices, or data lakes
 
@@ -103,6 +103,53 @@ Lesson: **monitor consumer lag aggressively**. Set alerts at thresholds that giv
 kafka-consumer-groups.sh --bootstrap-server localhost:9092 \
   --describe --group order-processor
 ```
+
+### Archiving Kafka Logs to S3
+
+One challenge with Kafka at scale is storage cost. Keeping weeks or months of data on broker disks (fast SSDs) gets expensive fast. In one of my projects, we had 3M events/second with a 30-day retention policy — the disk bill alone was painful.
+
+The solution: **tiered storage**. Keep recent data (hot) on local broker disks for fast consumer reads, and push older segments (cold) to S3 in parallel. Consumers reading recent data see zero latency impact, and you get virtually unlimited retention at a fraction of the cost.
+
+If you're on Confluent Platform or a managed Kafka service, tiered storage is a built-in feature. But in a self-managed setup, I've used Kafka Connect with the S3 Sink Connector to stream topic data into S3 as Parquet or JSON files:
+
+```typescript
+// S3 Sink Connector configuration
+const s3SinkConfig = {
+  name: 'orders-s3-archive',
+  'connector.class': 'io.confluent.connect.s3.S3SinkConnector',
+  'tasks.max': '4',
+  'topics': 'orders,payments,shipments',
+  's3.region': 'eu-west-1',
+  's3.bucket.name': 'kafka-event-archive',
+  's3.part.size': '52428800', // 50MB parts
+  'storage.class': 'io.confluent.connect.s3.storage.S3Storage',
+  'format.class': 'io.confluent.connect.s3.format.parquet.ParquetFormat',
+  'partitioner.class': 'io.confluent.connect.storage.partitioner.TimeBasedPartitioner',
+  'path.format': "'year'=YYYY/'month'=MM/'day'=dd/'hour'=HH",
+  'locale': 'en-US',
+  'timezone': 'UTC',
+  'flush.size': '10000',        // flush every 10K records
+  'rotate.interval.ms': '600000', // or every 10 minutes
+};
+```
+
+This gives you a nice S3 directory structure like:
+
+```
+s3://kafka-event-archive/
+  topics/orders/
+    year=2025/month=01/day=14/hour=09/
+      orders+0+0000000000.parquet
+      orders+1+0000000000.parquet
+```
+
+Once the data lands in S3, you can query it with Athena, load it into a data warehouse, or replay events by reading from S3 when you need to reprocess historical data. I've used this pattern to rebuild read models months after the original events were consumed — something that would be impossible with Kafka's default retention alone.
+
+A few things to watch out for:
+
+- **S3 lifecycle policies:** Move archived data to S3 Glacier after 90 days if you rarely need it — storage cost drops to ~$0.004/GB.
+- **Exactly-once delivery to S3:** The S3 Sink Connector handles this, but verify your `flush.size` and `rotate.interval.ms` settings balance latency vs. file count.
+- **Schema consistency:** If your event schemas evolve, Parquet files with mixed schemas become a headache. Pair this with a Schema Registry.
 
 ## RabbitMQ: The Smart Broker
 
