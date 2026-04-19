@@ -1,0 +1,35 @@
+name: Article Topic
+description: Submit a new blog article topic
+labels: ["blog-post", "pending"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description / Notes
+      description: Additional context, key points, or instructions for the AI article generator
+      placeholder: "e.g. Focus on real-world use cases, compare with alternatives, include code examples..."
+    validations:
+      required: false
+  - type: input
+    id: target-date
+    attributes:
+      label: Target Publish Date
+      description: Optional target date for publishing (informational only)
+      placeholder: "YYYY-MM-DD"
+    validations:
+      required: false
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Select the article category
+      options:
+        - backend:ruby-on-rails
+        - backend:nestjs
+        - backend:microservices
+        - backend:ddd
+        - frontend
+        - production-engineering
+        - experience-story
+    validations:
+      required: true
