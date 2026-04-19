@@ -1,0 +1,508 @@
+---
+title: "Saga Pattern in Microservices: Orchestration vs Choreography with Real-World Scenarios"
+description: "A practical guide to implementing the Saga pattern for distributed transactions — comparing orchestration and choreography with TypeScript examples, compensating transactions, and lessons from production systems."
+datetime: "2022-10-04"
+image: ""
+---
+
+We had a classic distributed transaction problem. Our e-commerce platform had grown from a monolith into about 30 microservices, and the order flow touched five of them: Order, Payment, Inventory, Shipping, and Notification. When a customer placed an order, all five services needed to agree on the outcome. If payment failed after inventory was reserved, we needed to release those items. If shipping couldn't be arranged after payment was captured, we needed a refund.
+
+Our first instinct was Two-Phase Commit (2PC). We tried it for about two weeks before abandoning it entirely. The coordinator became a single point of failure, the blocking nature killed our throughput, and when the coordinator itself crashed mid-transaction, we had orphaned locks across three databases. That's when we turned to the Saga pattern.
+
+## What a Saga Actually Is
+
+A saga is a sequence of local transactions where each step has a corresponding compensating transaction. If step 4 fails, you don't roll back a distributed transaction — you execute compensating actions for steps 3, 2, and 1 in reverse order. It's not an undo in the traditional database sense. It's a series of new transactions that semantically reverse the effect.
+
+The key insight: **sagas trade atomicity for availability**. You accept temporary inconsistency in exchange for a system that doesn't block and can recover from partial failures.
+
+There are two ways to coordinate a saga: choreography (decentralized, event-driven) and orchestration (centralized coordinator). I've used both in production, and the right choice depends entirely on the complexity of your business flow.
+
+## Choreography: Let Services Talk to Each Other
+
+In a choreography-based saga, there's no central coordinator. Each service listens for events and decides what to do next. It's like a jazz ensemble — each musician listens to the others and plays their part.
+
+### How It Looks in Practice
+
+Here's the order flow as a choreography:
+
+```typescript
+// Order Service — starts the saga by publishing an event
+import { Kafka } from 'kafkajs';
+
+const kafka = new Kafka({ brokers: ['localhost:9092'] });
+const producer = kafka.producer();
+
+async function createOrder(orderData: CreateOrderDto) {
+  const order = await orderRepository.save({
+    ...orderData,
+    status: 'PENDING',
+  });
+
+  await producer.send({
+    topic: 'order.created',
+    messages: [{
+      key: order.id,
+      value: JSON.stringify({
+        orderId: order.id,
+        userId: order.userId,
+        items: order.items,
+        totalAmount: order.totalAmount,
+      }),
+    }],
+  });
+
+  return order;
+}
+```
+
+```typescript
+// Payment Service — listens for order.created, processes payment
+const consumer = kafka.consumer({ groupId: 'payment-service' });
+await consumer.subscribe({ topic: 'order.created' });
+
+await consumer.run({
+  eachMessage: async ({ message }) => {
+    const event = JSON.parse(message.value.toString());
+
+    try {
+      const payment = await paymentGateway.charge({
+        userId: event.userId,
+        amount: event.totalAmount,
+        orderId: event.orderId,
+        idempotencyKey: `order-${event.orderId}`,
+      });
+
+      await producer.send({
+        topic: 'payment.completed',
+        messages: [{
+          key: event.orderId,
+          value: JSON.stringify({
+            orderId: event.orderId,
+            paymentId: payment.id,
+            amount: payment.amount,
+          }),
+        }],
+      });
+    } catch (error) {
+      await producer.send({
+        topic: 'payment.failed',
+        messages: [{
+          key: event.orderId,
+          value: JSON.stringify({
+            orderId: event.orderId,
+            reason: error.message,
+          }),
+        }],
+      });
+    }
+  },
+});
+```
+
+```typescript
+// Inventory Service — listens for payment.completed, reserves stock
+await consumer.subscribe({ topics: ['payment.completed', 'order.cancelled'] });
+
+await consumer.run({
+  eachMessage: async ({ topic, message }) => {
+    const event = JSON.parse(message.value.toString());
+
+    if (topic === 'payment.completed') {
+      try {
+        await inventoryRepository.reserveItems(event.orderId, event.items);
+
+        await producer.send({
+          topic: 'inventory.reserved',
+          messages: [{
+            key: event.orderId,
+            value: JSON.stringify({ orderId: event.orderId }),
+          }],
+        });
+      } catch (error) {
+        // Compensate: refund the payment
+        await producer.send({
+          topic: 'payment.refund.requested',
+          messages: [{
+            key: event.orderId,
+            value: JSON.stringify({
+              orderId: event.orderId,
+              paymentId: event.paymentId,
+              reason: 'Inventory reservation failed',
+            }),
+          }],
+        });
+      }
+    }
+
+    if (topic === 'order.cancelled') {
+      // Compensate: release reserved inventory
+      await inventoryRepository.releaseReservation(event.orderId);
+    }
+  },
+});
+```
+
+Each service knows only about its own domain and the events it cares about. No service has a global view of the entire flow.
+
+### When Choreography Works
+
+I've used choreography for simpler flows — 3-4 services, linear progression, limited branching. A notification pipeline is a great example: event comes in, email service picks it up, SMS service picks it up, push notification service picks it up. They're independent, they don't need coordination, and adding a new channel is just a new consumer.
+
+### When Choreography Falls Apart
+
+On that same e-commerce platform, the choreography approach worked fine until we hit about 15 event types in the order flow. At that point:
+
+- **Debugging was a nightmare.** When an order got stuck in a weird state, I had to trace events across five services, three Kafka topics, and two dead letter queues. There was no single place to see "where is this order in the saga?"
+- **Cyclic dependencies crept in.** The Inventory service started listening to Payment events, Payment started listening to Shipping events, and Shipping listened to Inventory. The event graph became a spaghetti diagram.
+- **Compensation chains were fragile.** If the Inventory service needed to trigger a payment refund, it published an event. But what if the refund failed? Who handles that? Each service only knew its immediate neighbors, not the full compensation chain.
+
+That's when we switched the order flow to orchestration.
+
+## Orchestration: One Coordinator to Rule Them All
+
+In an orchestration-based saga, a central coordinator (the orchestrator) explicitly drives the flow. It knows all the steps, their order, and what to do when something fails. Think of it as a conductor leading an orchestra.
+
+### The Saga Orchestrator
+
+Here's how I implemented the order saga orchestrator using a state machine approach:
+
+```typescript
+// saga-orchestrator.ts
+type SagaStatus =
+  | 'STARTED'
+  | 'PAYMENT_PENDING'
+  | 'PAYMENT_COMPLETED'
+  | 'INVENTORY_PENDING'
+  | 'INVENTORY_RESERVED'
+  | 'SHIPPING_PENDING'
+  | 'SHIPPING_CONFIRMED'
+  | 'COMPLETED'
+  | 'COMPENSATING'
+  | 'FAILED';
+
+interface SagaState {
+  orderId: string;
+  status: SagaStatus;
+  paymentId?: string;
+  shipmentId?: string;
+  failedStep?: string;
+  failReason?: string;
+  compensationStep?: string;
+  retryCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+class OrderSagaOrchestrator {
+  constructor(
+    private sagaRepository: SagaRepository,
+    private paymentClient: PaymentClient,
+    private inventoryClient: InventoryClient,
+    private shippingClient: ShippingClient,
+    private notificationClient: NotificationClient,
+  ) {}
+
+  async start(order: Order): Promise<void> {
+    const saga = await this.sagaRepository.create({
+      orderId: order.id,
+      status: 'STARTED',
+      retryCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await this.executeStep(saga);
+  }
+
+  async executeStep(saga: SagaState): Promise<void> {
+    try {
+      switch (saga.status) {
+        case 'STARTED':
+          await this.processPayment(saga);
+          break;
+        case 'PAYMENT_COMPLETED':
+          await this.reserveInventory(saga);
+          break;
+        case 'INVENTORY_RESERVED':
+          await this.arrangeShipping(saga);
+          break;
+        case 'SHIPPING_CONFIRMED':
+          await this.completeSaga(saga);
+          break;
+        case 'COMPENSATING':
+          await this.compensate(saga);
+          break;
+      }
+    } catch (error) {
+      await this.handleFailure(saga, error);
+    }
+  }
+
+  private async processPayment(saga: SagaState): Promise<void> {
+    await this.updateStatus(saga, 'PAYMENT_PENDING');
+
+    const payment = await this.paymentClient.charge({
+      orderId: saga.orderId,
+      idempotencyKey: `saga-${saga.orderId}-payment`,
+    });
+
+    saga.paymentId = payment.id;
+    await this.updateStatus(saga, 'PAYMENT_COMPLETED');
+    await this.executeStep(saga);
+  }
+
+  private async reserveInventory(saga: SagaState): Promise<void> {
+    await this.updateStatus(saga, 'INVENTORY_PENDING');
+
+    await this.inventoryClient.reserve({
+      orderId: saga.orderId,
+      idempotencyKey: `saga-${saga.orderId}-inventory`,
+    });
+
+    await this.updateStatus(saga, 'INVENTORY_RESERVED');
+    await this.executeStep(saga);
+  }
+
+  private async arrangeShipping(saga: SagaState): Promise<void> {
+    await this.updateStatus(saga, 'SHIPPING_PENDING');
+
+    const shipment = await this.shippingClient.arrange({
+      orderId: saga.orderId,
+      idempotencyKey: `saga-${saga.orderId}-shipping`,
+    });
+
+    saga.shipmentId = shipment.id;
+    await this.updateStatus(saga, 'SHIPPING_CONFIRMED');
+    await this.executeStep(saga);
+  }
+
+  private async completeSaga(saga: SagaState): Promise<void> {
+    await this.updateStatus(saga, 'COMPLETED');
+
+    await this.notificationClient.send({
+      type: 'ORDER_CONFIRMED',
+      orderId: saga.orderId,
+    });
+  }
+
+  private async handleFailure(
+    saga: SagaState,
+    error: Error,
+  ): Promise<void> {
+    saga.failedStep = saga.status;
+    saga.failReason = error.message;
+
+    if (saga.retryCount < 3) {
+      saga.retryCount++;
+      const delay = Math.pow(2, saga.retryCount) * 1000;
+      console.log(
+        `Saga ${saga.orderId}: retry ${saga.retryCount}/3 in ${delay}ms`,
+      );
+      await this.sleep(delay);
+      await this.executeStep(saga);
+      return;
+    }
+
+    await this.updateStatus(saga, 'COMPENSATING');
+    await this.compensate(saga);
+  }
+
+  // ...updateStatus, sleep helpers
+}
+```
+
+The orchestrator holds the entire state machine. When something fails, it knows exactly which compensating transactions to run and in what order.
+
+### Compensating Transactions
+
+This is the part most articles skip over, and it's the hardest part to get right. Compensating transactions are NOT database rollbacks. They're new forward transactions that semantically undo the effect of a previous step.
+
+```typescript
+private async compensate(saga: SagaState): Promise<void> {
+  const compensationSteps: Array<{
+    condition: () => boolean;
+    action: () => Promise<void>;
+    name: string;
+  }> = [
+    {
+      name: 'cancel-shipping',
+      condition: () => !!saga.shipmentId,
+      action: async () => {
+        await this.shippingClient.cancel({
+          shipmentId: saga.shipmentId!,
+          orderId: saga.orderId,
+          idempotencyKey: `saga-${saga.orderId}-cancel-shipping`,
+        });
+      },
+    },
+    {
+      name: 'release-inventory',
+      condition: () =>
+        ['INVENTORY_RESERVED', 'SHIPPING_PENDING', 'SHIPPING_CONFIRMED'].includes(
+          saga.failedStep || '',
+        ),
+      action: async () => {
+        await this.inventoryClient.release({
+          orderId: saga.orderId,
+          idempotencyKey: `saga-${saga.orderId}-release-inventory`,
+        });
+      },
+    },
+    {
+      name: 'refund-payment',
+      condition: () => !!saga.paymentId,
+      action: async () => {
+        await this.paymentClient.refund({
+          paymentId: saga.paymentId!,
+          orderId: saga.orderId,
+          reason: saga.failReason || 'Saga compensation',
+          idempotencyKey: `saga-${saga.orderId}-refund`,
+        });
+      },
+    },
+  ];
+
+  for (const step of compensationSteps) {
+    if (step.condition()) {
+      try {
+        saga.compensationStep = step.name;
+        await this.sagaRepository.update(saga);
+        await step.action();
+        console.log(`Saga ${saga.orderId}: compensated ${step.name}`);
+      } catch (error) {
+        console.error(
+          `Saga ${saga.orderId}: compensation failed at ${step.name}`,
+          error,
+        );
+        // Log to dead letter / alert on-call — manual intervention needed
+        await this.alertOncall(saga, step.name, error);
+        return;
+      }
+    }
+  }
+
+  await this.updateStatus(saga, 'FAILED');
+
+  await this.notificationClient.send({
+    type: 'ORDER_FAILED',
+    orderId: saga.orderId,
+    reason: saga.failReason,
+  });
+}
+```
+
+Notice the **idempotency keys** on every call. This is critical. If the orchestrator crashes and restarts, it will re-execute the current step. Without idempotency keys, you'd charge a customer twice or release inventory that was never reserved.
+
+### Persisting Saga State
+
+The orchestrator's state must survive crashes. I store it in PostgreSQL with optimistic locking:
+
+```typescript
+// saga-repository.ts
+@Injectable()
+class SagaRepository {
+  constructor(private dataSource: DataSource) {}
+
+  async update(saga: SagaState): Promise<void> {
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .update('order_sagas')
+      .set({
+        status: saga.status,
+        paymentId: saga.paymentId,
+        shipmentId: saga.shipmentId,
+        failedStep: saga.failedStep,
+        failReason: saga.failReason,
+        compensationStep: saga.compensationStep,
+        retryCount: saga.retryCount,
+        updatedAt: new Date(),
+        version: () => 'version + 1',
+      })
+      .where('order_id = :orderId AND version = :version', {
+        orderId: saga.orderId,
+        version: saga.version,
+      })
+      .execute();
+
+    if (result.affected === 0) {
+      throw new Error(`Concurrent saga update for order ${saga.orderId}`);
+    }
+  }
+
+  async findStuckSagas(olderThanMinutes: number): Promise<SagaState[]> {
+    return this.dataSource
+      .createQueryBuilder()
+      .select()
+      .from('order_sagas', 's')
+      .where('s.status NOT IN (:...terminal)', {
+        terminal: ['COMPLETED', 'FAILED'],
+      })
+      .andWhere('s.updated_at < NOW() - INTERVAL :minutes MINUTE', {
+        minutes: olderThanMinutes,
+      })
+      .getMany();
+  }
+}
+```
+
+The `findStuckSagas` query is for a cron job that runs every 5 minutes and alerts us about sagas that haven't progressed. In production, this has caught network partitions, downstream service outages, and even a Kubernetes pod that was stuck in a terminating state for 3 hours.
+
+## Semantic Undo vs Physical Undo
+
+A refund is not the same as "undoing" a payment. The customer sees a charge and then a refund on their statement — two distinct transactions. The inventory gets reserved and then released — two database writes. This is semantic undo: you don't rewind time, you move forward to a correct state.
+
+Physical undo (actually reverting database state) is tempting but dangerous in distributed systems. You can't un-send an email. You can't un-charge a credit card. You can't un-ship a package. Design your compensations as forward-moving actions from the start.
+
+Some compensations are also **not reversible at all**. If a physical product has already shipped, you can't "compensate" the shipping step — you need a return flow, which is a completely separate saga.
+
+## Production Gotchas
+
+### The Friday Deploy Incident
+
+We deployed a new version of the Payment service on a Friday afternoon (lesson learned). The new version had a subtle bug: it acknowledged the Kafka message before confirming the payment with Stripe. When the service crashed mid-processing, Kafka thought the message was consumed, but Stripe never received the charge. We ended up with 340 orders in a "payment pending" state with no way to automatically recover.
+
+The fix was two-fold: commit offsets AFTER processing (at-least-once delivery), and add a reconciliation job that compares saga state with Stripe's records every hour.
+
+### The Compensation Loop
+
+Our first compensation implementation had a bug where a failed refund triggered a new saga step, which failed, which triggered another refund attempt, creating an infinite loop. The dead letter queue filled up with 2 million messages over a weekend.
+
+The fix: **cap compensation retries** (we use 3 attempts with exponential backoff), and if all retries fail, alert the on-call engineer for manual resolution. Some failures genuinely need a human.
+
+### Timeout Handling
+
+We initially didn't have timeouts on the orchestrator. A downstream service went unresponsive for 45 minutes, and the saga just... waited. Meanwhile, the customer had no feedback, and inventory was locked.
+
+Now every saga step has a timeout (30 seconds for payment, 10 seconds for inventory, 60 seconds for shipping). If a step times out, the orchestrator treats it as a failure and begins compensation. The downstream service might eventually complete its work, so the compensation needs to handle the "already completed" case gracefully.
+
+## When to Use Which
+
+After running both patterns in production for years, here's my decision framework:
+
+**Use choreography when:**
+- The flow is simple (3-4 services, linear progression)
+- Services are truly independent and don't need coordinated rollback
+- You want maximum decoupling and each team owns their service end-to-end
+- Adding new steps should be as easy as subscribing to an event
+
+**Use orchestration when:**
+- The flow has 5+ steps with complex branching and conditional logic
+- Compensation chains are critical and must be coordinated
+- You need a single dashboard to monitor saga progress
+- Business stakeholders need to understand and audit the flow
+- Multiple sagas can run concurrently for the same entity (you need explicit conflict handling)
+
+**Hybrid approach** (what we ended up with): Orchestration for the core order flow (complex, business-critical, needs tight compensation), choreography for downstream side effects (notifications, analytics events, search index updates). The orchestrator publishes a single `order.completed` event, and downstream services choreograph independently.
+
+## Key Takeaways
+
+- **Sagas are not distributed transactions.** They trade atomicity for availability. Accept temporary inconsistency and design for it.
+- **Idempotency is not optional.** Every service call in a saga must be idempotent. Use idempotency keys on every external call.
+- **Compensations are harder than the happy path.** Budget 2-3x the implementation time for compensation logic compared to the forward flow.
+- **Persist saga state.** If your orchestrator crashes, you need to pick up where you left off. Use a database, not in-memory state.
+- **Monitor stuck sagas.** A saga that hasn't progressed in 5 minutes is probably stuck. Alert on it before the customer does.
+- **Start with choreography, migrate to orchestration when complexity demands it.** You'll know when choreography isn't enough — debugging becomes impossible and compensation chains break silently.
+
+---
+
+Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
