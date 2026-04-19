@@ -18,10 +18,12 @@
     ]
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.53",
     "@astrojs/check": "0.9.4",
     "@astrojs/mdx": "4.1.0",
     "@astrojs/sitemap": "^3.2.1",
     "@astrojs/tailwind": "6.0.0",
+    "ai": "^6.0.168",
     "astro": "5.4.1",
     "astro-icon": "^1.1.1",
     "sharp": "^0.34.5",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@iconify-json/simple-icons": "^1.2.78",
-    "@tailwindcss/typography": "^0.5.15"
+    "@tailwindcss/typography": "^0.5.15",
+    "tsx": "^4.21.0"
   }
 }

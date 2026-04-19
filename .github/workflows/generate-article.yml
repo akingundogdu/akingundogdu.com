@@ -1,0 +1,111 @@
+name: Generate Daily Article
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: generate-article
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate article
+        id: generate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OUTPUT=$(pnpm tsx scripts/generate-article.ts 2>&1)
+          echo "$OUTPUT"
+
+          META=$(echo "$OUTPUT" | tail -1)
+          if echo "$META" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+            echo "ISSUE_NUMBER=$(echo "$META" | python3 -c "import sys,json; print(json.load(sys.stdin)['issueNumber'])")" >> "$GITHUB_OUTPUT"
+            echo "SLUG=$(echo "$META" | python3 -c "import sys,json; print(json.load(sys.stdin)['slug'])")" >> "$GITHUB_OUTPUT"
+            echo "TITLE=$(echo "$META" | python3 -c "import sys,json; print(json.load(sys.stdin)['title'])")" >> "$GITHUB_OUTPUT"
+            echo "HAS_ARTICLE=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No pending issues or generation failed."
+            echo "HAS_ARTICLE=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create branch and PR
+        if: steps.generate.outputs.HAS_ARTICLE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SLUG="${{ steps.generate.outputs.SLUG }}"
+          ISSUE="${{ steps.generate.outputs.ISSUE_NUMBER }}"
+          TITLE="${{ steps.generate.outputs.TITLE }}"
+          BRANCH="article/${SLUG}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add "src/content/blogs/${SLUG}.mdx" "scripts/.last-category"
+          git commit -m "Add article: ${TITLE}"
+          git push origin "$BRANCH"
+
+          PR_URL=$(gh pr create \
+            --title "Article: ${TITLE}" \
+            --body "$(cat <<EOF
+          ## Auto-generated article
+
+          **Source issue:** #${ISSUE}
+          **Category:** $(cat scripts/.last-category)
+
+          ---
+
+          Closes #${ISSUE}
+          EOF
+          )" \
+            --base main \
+            --head "$BRANCH")
+
+          echo "PR_URL=${PR_URL}" >> "$GITHUB_OUTPUT"
+
+          gh issue edit "$ISSUE" --remove-label "in-progress" --add-label "in-review"
+
+      - name: Notify Slack
+        if: steps.generate.outputs.HAS_ARTICLE == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL_FOR_RECURRING_ARTICLE }}
+        run: |
+          TITLE="${{ steps.generate.outputs.TITLE }}"
+          ISSUE="${{ steps.generate.outputs.ISSUE_NUMBER }}"
+          SLUG="${{ steps.generate.outputs.SLUG }}"
+          PR_URL="https://github.com/${{ github.repository }}/pulls"
+
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<EOF
+          {
+            "text": "New article PR ready for review:\n*${TITLE}*\nIssue: #${ISSUE}\n<${PR_URL}|View Pull Requests>"
+          }
+          EOF
+          )"
