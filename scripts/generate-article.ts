@@ -21,6 +21,18 @@ const CATEGORIES = [
   "experience-story",
 ];
 
+const CATEGORY_RULE_MAP: Record<string, string> = {
+  "backend:ruby-on-rails": "backend-ruby-on-rails.md",
+  "backend:nestjs": "backend-nestjs.md",
+  "backend:microservices": "backend-microservices.md",
+  "backend:ddd": "backend-ddd.md",
+  "frontend": "frontend.md",
+  "production-engineering": "production-engineering.md",
+  "experience-story": "experience-story.md",
+};
+
+const RULES_DIR = join(__dirname, "prompts", "rules");
+
 interface Issue {
   number: number;
   title: string;
@@ -108,8 +120,28 @@ function randomDate(): string {
   return rand.toISOString().split("T")[0];
 }
 
-async function generateArticle(issue: Issue): Promise<string> {
-  const systemPrompt = readFileSync(PROMPT_FILE, "utf-8");
+function loadCategoryRules(category: string): string {
+  const ruleFile = CATEGORY_RULE_MAP[category];
+  if (!ruleFile) return "";
+
+  const rulePath = join(RULES_DIR, ruleFile);
+  if (existsSync(rulePath)) {
+    return readFileSync(rulePath, "utf-8");
+  }
+  return "";
+}
+
+async function generateArticle(
+  issue: Issue,
+  category: string
+): Promise<string> {
+  const basePrompt = readFileSync(PROMPT_FILE, "utf-8");
+  const categoryRules = loadCategoryRules(category);
+
+  const systemPrompt = categoryRules
+    ? `${basePrompt}\n\n---\n\n## Category-Specific Rules\n\n${categoryRules}`
+    : basePrompt;
+
   const cleanTitle = issue.title.replace(/^\[.*?\]\s*/, "");
   const datetime = randomDate();
 
@@ -117,10 +149,19 @@ async function generateArticle(issue: Issue): Promise<string> {
     `Write a blog article with the following details:`,
     ``,
     `**Title:** ${cleanTitle}`,
+    `**Category:** ${category}`,
     `**Date to use in frontmatter:** ${datetime}`,
+    ``,
     issue.body
-      ? `**Additional context / notes:**\n${issue.body}`
+      ? `**Additional context / notes from the issue:**\n${issue.body}`
       : "",
+    ``,
+    `## Reminders`,
+    `- Start with a specific, personal hook — NO generic introductions.`,
+    `- Include at least 3-5 production-grade code examples with error handling.`,
+    `- Share at least 2-3 real production gotchas or war stories with specific numbers.`,
+    `- End with practical takeaways and the personal sign-off.`,
+    `- The article must read as if written by a human engineer, not an AI.`,
     ``,
     `Generate the complete MDX file now.`,
   ]
@@ -174,8 +215,8 @@ async function main() {
   );
   console.log("Label updated: pending → in-progress");
 
-  console.log("Generating article with Gemini...");
-  const content = await generateArticle(issue);
+  console.log(`Generating article with OpenAI (category: ${category})...`);
+  const content = await generateArticle(issue, category);
 
   const slug = slugify(issue.title);
   const filePath = join(BLOGS_DIR, `${slug}.mdx`);
