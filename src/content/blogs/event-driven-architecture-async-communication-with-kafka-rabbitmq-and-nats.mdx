@@ -160,7 +160,7 @@ RabbitMQ is a traditional message broker — it routes messages intelligently an
 - Complex routing requirements (route by content, headers, patterns)
 - Request/reply patterns (RPC over messaging)
 - Priority-based processing
-- Smaller scale (<50K messages/second) where operational simplicity matters
+- Smaller scale (under 50K messages/second) where operational simplicity matters
 - Teams already familiar with AMQP
 
 ### Exchange Types in Practice
@@ -313,7 +313,7 @@ Lesson: if ordering matters, **use specific subjects as your ordering boundary**
 | Aspect | Kafka | RabbitMQ | NATS (JetStream) |
 |--------|-------|----------|-------------------|
 | **Throughput** | 1M+ msg/s | ~50K msg/s | ~500K msg/s |
-| **Latency (p99)** | 5-15ms | 1-5ms | <1ms |
+| **Latency (p99)** | 5-15ms | 1-5ms | sub-1ms |
 | **Ordering** | Per-partition | Per-queue | Per-subject |
 | **Replay** | Yes (offset-based) | No | Yes (sequence-based) |
 | **Routing** | Topic/partition only | Exchanges + bindings | Subject hierarchy |
@@ -368,7 +368,7 @@ After years of running these in production, here's my shortcut:
 **Pick RabbitMQ when:**
 - You need complex routing logic
 - Request/reply (RPC) patterns are common
-- Your throughput is moderate (<50K msg/s)
+- Your throughput is moderate (under 50K msg/s)
 - You want mature tooling and monitoring out of the box
 
 **Pick NATS when:**
