@@ -7,7 +7,16 @@ interface Tech {
   link: string;
 }
 
+/**
+ * One "See more" per experience card (entire bullet list or details block), not per bullet.
+ * Show toggle when there are several bullets or the combined text is long.
+ */
+const CARD_EXPAND_MIN_BULLETS = 2;
+const CARD_EXPAND_MIN_CHARS = 90;
+const DETAILS_EXPAND_MIN_CHARS = 75;
+
 const {
+  cardIndex = 0,
   title,
   sub_title,
   years,
@@ -17,7 +26,11 @@ const {
   company_icon,
   company_logo_url,
   technologies = [],
+  duration,
+  country,
+  work_mode,
 } = Astro.props as {
+  cardIndex?: number;
   title: string;
   sub_title: string;
   years: string;
@@ -27,7 +40,13 @@ const {
   company_icon?: string;
   company_logo_url?: string;
   technologies?: Tech[];
+  duration?: string;
+  country?: string;
+  work_mode?: string;
 };
+
+const companyMeta = [duration, country, work_mode].filter(Boolean).join(' · ');
+const hasCompanyMeta = companyMeta.length > 0;
 
 function companyInitials(name: string): string {
   const tokens = name
@@ -42,6 +61,12 @@ function companyInitials(name: string): string {
 
 const bulletItems = bullets?.filter(Boolean) ?? [];
 const hasBullets = bulletItems.length > 0;
+const bulletBodyChars = bulletItems.reduce((sum, line) => sum + line.length, 0);
+const needsExperienceExpand =
+  hasBullets &&
+  (bulletItems.length >= CARD_EXPAND_MIN_BULLETS || bulletBodyChars >= CARD_EXPAND_MIN_CHARS);
+const needsDetailsExpandBlock =
+  Boolean(details && details.length >= DETAILS_EXPAND_MIN_CHARS);
 const techList = technologies ?? [];
 const useCompanyBlock =
   hasBullets ||
@@ -100,8 +125,13 @@ const initials = companyInitials(sub_title);
                   </span>
                 )}
               </span>
-              <span class="text-lg font-medium text-secondary group-hover:text-primary transition-colors break-words">
-                {sub_title}
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="text-lg font-medium text-secondary group-hover:text-primary transition-colors break-words">
+                  {sub_title}
+                </span>
+                {hasCompanyMeta ? (
+                  <span class="text-sm font-normal text-offset leading-snug">{companyMeta}</span>
+                ) : null}
               </span>
             </a>
           ) : (
@@ -134,7 +164,12 @@ const initials = companyInitials(sub_title);
                   </span>
                 )}
               </span>
-              <span class="text-lg font-medium text-secondary break-words">{sub_title}</span>
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="text-lg font-medium text-secondary break-words">{sub_title}</span>
+                {hasCompanyMeta ? (
+                  <span class="text-sm font-normal text-offset leading-snug">{companyMeta}</span>
+                ) : null}
+              </span>
             </div>
           )}
         </div>
@@ -159,13 +194,97 @@ const initials = companyInitials(sub_title);
         )}
 
         {hasBullets ? (
-          <ul class="mt-4 space-y-2.5 text-offset leading-relaxed list-disc pl-5 marker:text-primary">
-            {bulletItems.map((line) => (
-              <li>{line}</li>
-            ))}
-          </ul>
+          needsExperienceExpand ? (
+            <div class="portfolio-card-expand mt-4">
+              <input
+                type="checkbox"
+                id={`portfolio-card-${cardIndex}`}
+                class="portfolio-card-expand-input peer sr-only"
+              />
+              <div class="portfolio-card-expand-shell relative">
+                <div class="portfolio-card-expand-inner overflow-hidden max-h-[6rem] sm:max-h-[6.75rem] transition-[max-height] duration-300 ease-out">
+                  <ul class="space-y-2.5 text-offset leading-relaxed list-disc pl-5 marker:text-primary">
+                    {bulletItems.map((line) => (
+                      <li>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div
+                  class="portfolio-card-expand-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[4.5rem] sm:h-20 transition-opacity duration-200"
+                  aria-hidden="true"
+                >
+                  <div
+                    class="absolute inset-0 bg-gradient-to-t from-[var(--color-background-offset)] from-[8%] via-[var(--color-background-offset)]/95 to-transparent"
+                  />
+                  <span
+                    class="relative flex h-full items-end justify-center pb-1 text-xs leading-none text-primary/50"
+                  >
+                    ⌄
+                  </span>
+                </div>
+              </div>
+              <label
+                for={`portfolio-card-${cardIndex}`}
+                class="mt-2 inline-block cursor-pointer text-sm font-medium text-primary hover:underline peer-checked:hidden"
+              >
+                See more
+              </label>
+              <label
+                for={`portfolio-card-${cardIndex}`}
+                class="mt-2 hidden cursor-pointer text-sm font-medium text-primary hover:underline peer-checked:inline-block"
+              >
+                See less
+              </label>
+            </div>
+          ) : (
+            <ul class="mt-4 space-y-2.5 text-offset leading-relaxed list-disc pl-5 marker:text-primary">
+              {bulletItems.map((line) => (
+                <li>{line}</li>
+              ))}
+            </ul>
+          )
         ) : details ? (
-          <p class="mt-4 text-offset leading-relaxed">{details}</p>
+          needsDetailsExpandBlock ? (
+            <div class="portfolio-card-expand mt-4">
+              <input
+                type="checkbox"
+                id={`portfolio-card-${cardIndex}`}
+                class="portfolio-card-expand-input peer sr-only"
+              />
+              <div class="portfolio-card-expand-shell relative">
+                <div class="portfolio-card-expand-inner overflow-hidden max-h-[6rem] sm:max-h-[6.75rem] transition-[max-height] duration-300 ease-out">
+                  <p class="text-offset leading-relaxed">{details}</p>
+                </div>
+                <div
+                  class="portfolio-card-expand-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[4.5rem] sm:h-20 transition-opacity duration-200"
+                  aria-hidden="true"
+                >
+                  <div
+                    class="absolute inset-0 bg-gradient-to-t from-[var(--color-background-offset)] from-[8%] via-[var(--color-background-offset)]/95 to-transparent"
+                  />
+                  <span
+                    class="relative flex h-full items-end justify-center pb-1 text-xs leading-none text-primary/50"
+                  >
+                    ⌄
+                  </span>
+                </div>
+              </div>
+              <label
+                for={`portfolio-card-${cardIndex}`}
+                class="mt-2 inline-block cursor-pointer text-sm font-medium text-primary hover:underline peer-checked:hidden"
+              >
+                See more
+              </label>
+              <label
+                for={`portfolio-card-${cardIndex}`}
+                class="mt-2 hidden cursor-pointer text-sm font-medium text-primary hover:underline peer-checked:inline-block"
+              >
+                See less
+              </label>
+            </div>
+          ) : (
+            <p class="mt-4 text-offset leading-relaxed">{details}</p>
+          )
         ) : null}
       </>
     ) : (
@@ -176,3 +295,13 @@ const initials = companyInitials(sub_title);
     )
   }
 </li>
+
+<style is:global>
+  /* Expand inner + hide bottom fade when open (peer/inner are not siblings; mirror Hero tech-stack edge) */
+  .portfolio-card-expand-input:checked ~ .portfolio-card-expand-shell .portfolio-card-expand-inner {
+    max-height: 120rem;
+  }
+  .portfolio-card-expand-input:checked ~ .portfolio-card-expand-shell .portfolio-card-expand-fade {
+    opacity: 0;
+  }
+</style>

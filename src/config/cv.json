@@ -13,6 +13,7 @@
                 { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
                 { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
                 { "name": "Node.js", "icon": "simple-icons:nodedotjs", "link": "https://nodejs.org" },
+                { "name": "Socket.IO", "icon": "simple-icons:socketdotio", "link": "https://socket.io" },
                 { "name": "Python", "icon": "simple-icons:python", "link": "https://www.python.org" },
                 { "name": "Django", "icon": "simple-icons:django", "link": "https://www.djangoproject.com" },
                 { "name": "GraphQL", "icon": "simple-icons:graphql", "link": "https://graphql.org" },
@@ -128,6 +129,9 @@
             "title": "Senior Full Stack Software Engineer",
             "sub_title": "Kajabi",
             "years": "Mar 2023 - Jan 2026",
+            "duration": "2 years 10 months",
+            "country": "San Francisco, USA",
+            "work_mode": "Remote",
             "company_link": "https://kajabi.com",
             "company_icon": "Kajabi",
             "technologies": [
@@ -138,103 +142,152 @@
                 { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
                 { "name": "Python", "icon": "simple-icons:python", "link": "https://www.python.org" },
                 { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
-                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" }
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "Swift", "icon": "simple-icons:swift", "link": "https://www.swift.org" },
+                { "name": "Docker", "icon": "simple-icons:docker", "link": "https://www.docker.com" },
+                { "name": "Kubernetes", "icon": "simple-icons:kubernetes", "link": "https://kubernetes.io" },
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" },
+                { "name": "Node.js", "icon": "simple-icons:nodedotjs", "link": "https://nodejs.org" },
+                { "name": "AWS Lambda", "icon": "simple-icons:awslambda", "link": "https://aws.amazon.com/lambda/" },
+                { "name": "shadcn/ui", "icon": "simple-icons:shadcnui", "link": "https://ui.shadcn.com" },
+                { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss", "link": "https://tailwindcss.com" }
             ],
             "bullets": [
-                "Cost optimization: Optimized AWS RDS Aurora PostgreSQL instances using Reserved Instances during a hackathon event, achieving monthly infrastructure cost savings of $180,000.",
-                "Build workflow for BMA: Using GitHub Actions and Fastlane, developed an end-to-end build automation workflow using Ruby on Rails and Python that automatically builds and publishes mobile apps for nearly 5 million customers to Apple and Google app stores. This solution reduced operational costs by 48% and shortened the app release time by 80%.",
-                "Payment for BMA: Implemented native payment and subscription features via Apple and Google APIs for branded mobile apps, resulting in a 34% increase in product usage and a 12% uplift in sales for content creators after a 6-month complex backend development using Ruby on Rails.",
-                "Custom features for engagement: Designed and implemented an App Builder Studio using React.js and TypeScript for branded mobile apps, enabling users to independently design their own apps, boosting user retention rates by 26% and $5M GMV in 6 months."
+                "Infrastructure & cloud efficiency: Owned the community product’s PostgreSQL layer on AWS RDS Aurora—database maintenance, scaling, sharding and partitioning, and performance monitoring—alongside Reserved Instance planning and broader efficiency work so data infrastructure stays reliable and cloud spend stays disciplined as usage grows.",
+                "Branded Mobile Apps (BMA) release automation: Built a fully automated build-and-publish stack with GitHub Actions, Fastlane, Ruby on Rails, and Python so customers release native iOS and Android apps through their own Apple App Store and Google Play accounts without manual release work—the pipeline produces builds, applies screenshots, store copy, and required listing settings, submits for review, and carries approved releases through to production—making it practical to publish thousands of branded apps in minutes instead of operator-heavy release cycles.",
+                "Payments & subscriptions for BMA: Shipped native Apple and Google billing so creators can sell both one-time add-on purchases and recurring subscriptions to their own end users inside branded apps—giving our customers a way to monetize their audiences on mobile, not just on the web.",
+                "Creator-facing tooling: Designed and shipped App Builder Studio with React and TypeScript so customers can visually design their own branded mobile apps and publish them to the Apple App Store and Google Play without writing code—keeping routine mobile storefront work out of engineering queues while supporting engagement and commerce goals.",
+                "Community product: Partnered with the Community team to ship major features on our community experience—a product used by millions—using Node.js, AWS Lambda, React, shadcn/ui, and Tailwind CSS, with an active end-to-end role across services and UI.",
+                "Backend operations & production scale: Took ownership of backend operations and production concerns for systems used by millions—scaling, load balancing, capacity and health monitoring, and day-to-day reliability—so services stay stable and responsive as traffic and demand grow."
             ]
         },
         {
             "title": "Lead Full Stack Software Engineer",
             "sub_title": "Superpeer, Inc.",
             "years": "Dec 2020 - Mar 2023",
+            "duration": "2 years 3 months",
+            "country": "San Francisco, USA",
+            "work_mode": "Remote",
             "company_link": "https://superpeer.com",
             "company_logo_url": "https://media.licdn.com/dms/image/v2/C560BAQEv2HwulNsDbQ/company-logo_200_200/company-logo_200_200/0/1630618202137/superpeer_logo?e=1778112000&v=beta&t=q_3h_VvnSqB1iSZtyDl_FXR-FxqkZhJRSEvcoD02anM",
             "technologies": [
                 { "name": "Node.js", "icon": "simple-icons:nodedotjs", "link": "https://nodejs.org" },
                 { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
                 { "name": "Vue.js", "icon": "simple-icons:vuedotjs", "link": "https://vuejs.org" },
-                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" }
+                { "name": "Atomic CSS", "icon": "simple-icons:css3", "link": "https://css-tricks.com/lets-define-exactly-atomic-css/" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "Firestore", "icon": "simple-icons:firebase", "link": "https://firebase.google.com/products/firestore" },
+                { "name": "Docker", "icon": "simple-icons:docker", "link": "https://www.docker.com" },
+                { "name": "Kubernetes", "icon": "simple-icons:kubernetes", "link": "https://kubernetes.io" },
+                { "name": "Cloudflare Workers", "icon": "simple-icons:cloudflareworkers", "link": "https://workers.cloudflare.com" }
             ],
             "bullets": [
-                "High productivity: Rapidly analyzed competitors and delivered major features—Course Management, 1:1 Meeting Infrastructure, and Announcements—in just 2 months, resulting in a 17% revenue increase.",
-                "Take ownership & responsibility: Designed and implemented a new full-stack architecture within 8 months, trained the entire team, improving engineering productivity by 30% and production cost by 51%.",
-                "Fostering belonging: Led a team of 4 engineers to deliver all investment-critical web, backend and mobile backlog items end-to-end, and the company raised $2M in funding as a result."
+                "Product delivery: Analyzed competitors and the product landscape, then shipped major pillars—course management, one-to-one meeting infrastructure, and announcements—so the team could move the roadmap forward quickly and support commercial traction.",
+                "Architecture & enablement: Designed and implemented a new full-stack architecture, trained engineers on the stack, and tightened how we built and operated services—raising delivery quality while keeping production costs under control.",
+                "Engineering leadership: Led a focused engineering group to deliver investment-critical web, backend, and mobile work end-to-end, aligning execution with company priorities through a high-stakes growth and fundraising period.",
+                "Systems, quality & growth: Owned system management and scaling concerns, strengthened code review norms and overall code quality, validated critical business logic before release, and acted as a hands-on mentor—pairing and coaching so engineers could grow their technical judgment and ownership.",
+                "Edge caching & social previews: Built and ran an advanced caching setup on Cloudflare Workers so creator profile pages stay extremely fast at the edge, and shipped dynamic Open Graph meta so link previews stay accurate and compelling when profiles are shared.",
+                "Atomic CSS & design system: Played an active role in introducing atomic CSS and a structured system-design approach for the UI—defining patterns so interfaces aligned across the application—and split effort between implementation and cross-team alignment so user experience felt consistent and spoke one language everywhere."
             ]
         },
         {
             "title": "Lead Full Stack Software Engineer",
             "sub_title": "Epigra",
             "years": "Jan 2020 - Dec 2020",
+            "duration": "1 year",
+            "country": "London, UK",
+            "work_mode": "Remote",
             "company_link": "https://www.epigra.com",
             "company_logo_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAA4VBMVEVHcEzeLDvgN0j+bS3vSzDdKTvhMTvfOUzqT0rXHEDMADz+bzHMADvhKCn0RBriLTL/bzD2RxP////OBTvuaWD3aUP0ak/mVV7nS03yblz+cTfVGUH8cT7tQizRBTbkPUXzRR3d4+XX293qQzncPlf3+PjzwL/7dEjjNTzgRVz6ThXtbmzqmZ7n7O37Zi/qSD/kxMHv8vPdLUP0ZzjfSWfaKkjTACvXDTbwW0rkLCzLl5LprKnygG7KgnzcOxLy5eXo1tTtdXbdcFHMxcTcWTvulI2rBA67Pjzw3NrQXVnoe4Z3HM7/AAAAEnRSTlMAa8WfUDuW/iMju9LlE+XRe71Hqd6XAAABZUlEQVQokY3S53KCQBiFYY0FTWIKVUSFVZZmA6TYe839X1C+RchgSSbv32fYw8xuJvPv8oVfqfDKqE+lh1R5ZhhG9bziAysCNSXPM1U1e0NZQk3J90xTpSgqfz3GMEEQhpJpmhQlG8Z7OTEy1gy6pOkXmGyMx+N4uizBic2AjtJkYnKVZROUpFAKYzQAOh02hb7vw5eTw+F47qwjEsUEffjBcEljo7peEyGWoO+7rivPaYw1jdU0bQ/E8zG6LiUIgmpjjJejJaanPFiMJVMgdbCDe6vRyXG6QDwXY2RV23Hmx7N4cuwdEJdgldTu9aaD0Uxc9TSO2DCFA8D9BW1Cw36M8gBqtJCtjMQZQlNd54b9BNukxgQhe9ZtIbTRdb2eYOapQVpsUQtCE06v1+u13M+VvQEqiwnYdj4k9JJ+LVmFtNhtIqqlLzt6JopiWZZO6OP+EVU+AYFy93SZtq7Hrsvfjv3RN8XxOePqL5JBAAAAAElFTkSuQmCC",
             "technologies": [
                 { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
                 { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
                 { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
-                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" }
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "AWS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com" },
+                { "name": "Socket.IO", "icon": "simple-icons:socketdotio", "link": "https://socket.io" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "Express", "icon": "simple-icons:express", "link": "https://expressjs.com" },
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" }
             ],
             "bullets": [
-                "Architecture modernization: Converted all existing client projects (231) to a domain-driven design (DDD) architecture, creating a scalable and maintainable foundation across the portfolio.",
-                "ULive: Designed and built the ULive product from scratch with 3 engineers, enabling the company to secure $3M in investment within 6 months.",
-                "Technical leadership: Provided hands-on technical guidance on architecture and implementation decisions, helping keep code quality and structure consistent across projects.",
-                "Code quality & hiring: Reviewed pull requests and helped define coding standards to improve maintainability and reduce defects."
+                "Architecture modernization: Drove a portfolio-wide shift toward domain-driven design—restructuring legacy client systems around clear bounded contexts and shared patterns so multiple products could scale and stay maintainable under ongoing delivery pressure.",
+                "ULive product: Owned the ULive product end to end from early concept through launch, building it with a small focused team and helping the company present a credible, investor-ready story around a flagship SaaS offering.",
+                "ULive — build, mobile & ownership: Ran the ULive initiative across the full product lifecycle—priorities, sequencing, and release—coding core flows while standing up frontend and backend architecture from scratch, partnering with the mobile team to unblock delivery and keep milestones aligned, and steering both technical execution and coordination until ship as the accountable owner for the product.",
+                "Technical leadership: Stayed close to architecture and implementation decisions across engagements—unblocking teams, aligning backend and frontend direction, and keeping delivery practices coherent when several client projects ran in parallel.",
+                "Quality, reviews & people: Deepened pull-request review culture, helped define coding standards that reduced recurring defects, and contributed to hiring and mentoring so engineers leveled up on system design and day-to-day craft."
             ]
         },
         {
             "title": "Senior Full Stack Software Engineer",
             "sub_title": "My Next Match",
             "years": "Aug 2016 - Oct 2019",
+            "duration": "3 years 2 months",
+            "country": "London, UK",
+            "work_mode": "Remote",
             "company_link": "https://landing.mynextmatch.com/",
             "company_logo_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEX/////+vzqlqbbMVjUADbUAjb97/PcOl7SACjTADLrm6rVADTQDTrOWmvLSl/KEjzKACrRACy+mqLDyMi5cX7DADK8pam+V2rW2trT09PGTGK8i5XJyMrBLky8Sl/c3t7l5eXCP1fRACLIkpzp6enGs7jDJUbv7+/39/f5+fn8/Py5anjFg5D31d3icYPIur7RAB334ebmhZnPkJraV3Drp7XvwMnSNlDQeonWJ0zby8/ZTmjcRGL9zHGFAAABTUlEQVR4Ab2TBXIDMQxFnaw2K4eZEztoaJjp/ueq7DJz/9Cb0TNbjMXiAUD4SgCCeIyxRISc6q8aHKMEi2P4TjDJAv6ewAMG4XsBYOH7+VAIf1Xg9/eRInwhpNKZLIcbzGWyeXgmpArFUqmMHivVUqlWgCcCFMr1RqPRLFAdW0TtDn8iFLp1IaVo9/qYH9TlUIpROvVI4OO2VForUR8V23WHQzFAuBdSlZFUxlpn1AUhs3pYv8I7AXAihppRtBoOlTZEVsnGmHvBb4Dq0xl9D2O0sQ6dMa+kvJDKNaSyCcTFjPksARcrZpQYcHACrqluNwWiravHIsL+jtE29twJhQPtKt73t7UkYea2z49Lpk+5FAmUrU7ym+uIdstVHzyel0s3qxdwcfcxef8BFws36j8+DHz0aQE++PbR+40TsSS+J7i7vbzXvBf2YftfAxjMKa7glB4mAAAAAElFTkSuQmCC",
             "technologies": [
                 { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
                 { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
                 { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "Swift", "icon": "simple-icons:swift", "link": "https://www.swift.org" },
                 { "name": "Docker", "icon": "simple-icons:docker", "link": "https://www.docker.com" },
-                { "name": "Kubernetes", "icon": "simple-icons:kubernetes", "link": "https://kubernetes.io" }
+                { "name": "Kubernetes", "icon": "simple-icons:kubernetes", "link": "https://kubernetes.io" },
+                { "name": "Apache Kafka", "icon": "simple-icons:apachekafka", "link": "https://kafka.apache.org/" }
             ],
             "bullets": [
-                "Multi-platform product development: Worked as a core engineer across backend services, the main web application, and mobile apps, ensuring a consistent experience for all users.",
-                "Microservice architecture at scale: Designed and implemented a microservice-based architecture with 256 microservices running smoothly in production, enabling teams to ship features independently and scale safely.",
-                "End-to-end delivery & CI/CD: Contributed to roadmap and sprint planning, reviewed critical pull requests, and helped manage CI/CD pipelines to keep releases frequent and stable."
+                "Multi-platform product delivery: Owned substantial work across backend services, the primary React web application, and Swift-based mobile clients—aligning APIs, data contracts, and UX so athletes, clubs, and internal operators interacted with one coherent platform no matter which surface they used.",
+                "Microservices at scale: Designed and iterated on a large-scale, production-hardened microservice topology—hundreds of independently deployable services—so domain teams could ship in parallel while keeping fault isolation, rollout safety, and capacity growth aligned as traffic and feature surface area expanded.",
+                "Delivery & platform operations: Participated in roadmap and sprint planning, reviewed high-impact pull requests, and helped operate CI/CD and release practices—keeping deploys frequent and predictable and production steady in a fast-moving, always-on environment.",
+                "Production engineering & data plane: Took ownership of building, maintaining, and operating critical production infrastructure—scaling and sharding strategies as traffic grew—and standardized asynchronous communication on Apache Kafka so services could exchange events reliably, keeping the distributed system coherent and resilient under load."
             ]
         },
         {
             "title": "Full Stack Software Engineer",
             "sub_title": "Siskon (JTI)",
             "years": "Mar 2014 - Jun 2016",
+            "duration": "2 years 3 months",
+            "country": "Turkey",
+            "work_mode": "On-site",
             "company_link": "https://www.jti.com",
             "company_logo_url": "data:image/png;base64,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",
             "technologies": [
                 { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
                 { "name": "React", "icon": "simple-icons:react", "link": "https://react.dev" },
-                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" }
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "Express", "icon": "simple-icons:express", "link": "https://expressjs.com" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": ".NET", "icon": "simple-icons:dotnet", "link": "https://dotnet.microsoft.com" }
             ],
             "bullets": [
-                "Internal systems development: Delivered multiple internal web applications for operations, sales, and reporting, from requirements through to production deployment.",
-                "Architecture & data design: Designed database schemas and implemented backend architecture for both microservice-style and monolithic solutions.",
-                "Full-stack delivery: Worked across client- and server-side rendered frontends, performed code reviews, and handled deployments to keep systems stable in production."
+                "Internal systems portfolio: Built and evolved a set of internal web applications for plant operations, commercial sales, and management reporting—partnering with stakeholders from discovery and requirements through iterative delivery, hardening, and long-term production support so teams could trust the numbers and workflows they ran every day.",
+                "Architecture & data modeling: Owned relational schema design, integration seams, and backend structure across both service-oriented and monolithic deployments—choosing boundaries that fit legacy constraints while keeping reporting accurate, migrations safe, and downstream consumers consistent.",
+                "End-to-end engineering: Shipped features across server-rendered and richer client-side experiences in a TypeScript-heavy stack that bridged Ruby on Rails, Express, Nest.js, and .NET services; reviewed code for correctness and operational risk; and helped keep releases and deployments boringly reliable for on-site, always-on internal users."
             ]
         },
         {
             "title": "Software Engineer",
             "sub_title": "Narkonteks Tekstil A.Ş. (Blackspade)",
-            "years": "Feb 2013 - Mar 2014",
+            "years": "Feb 2012 - Apr 2014",
+            "duration": "2 years 2 months",
+            "country": "Turkey",
+            "work_mode": "On-site",
             "company_logo_url": "data:image/png;base64,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",
             "technologies": [
                 { "name": "Ruby on Rails", "icon": "simple-icons:rubyonrails", "link": "https://rubyonrails.org" },
                 { "name": "ASP.NET", "icon": "simple-icons:dotnet", "link": "https://dotnet.microsoft.com" },
                 { "name": "JavaScript", "icon": "simple-icons:javascript", "link": "https://developer.mozilla.org/en-US/docs/Web/JavaScript" },
+                { "name": "Express", "icon": "simple-icons:express", "link": "https://expressjs.com" },
                 { "name": "MySQL", "icon": "simple-icons:mysql", "link": "https://www.mysql.com" }
             ],
             "bullets": [
-                "Finance & stock systems migration: Worked on migrating accounting and stock management processes from SAP into in-house applications, replacing external systems with internal solutions tailored to the company's workflows.",
-                "Accounting & inventory domain expertise: Gained strong hands-on experience in finance and inventory flows (invoicing, payments, stock movements, costing), ensuring the software matched real-world business rules.",
-                "Internal tools for operations: Developed and maintained internal business and reporting tools used daily by finance and operations teams, helping them track production, inventory, and costs more accurately."
+                "Finance & stock systems migration: Helped move core accounting and inventory processes off SAP into bespoke internal applications—replacing rigid vendor workflows with software shaped around how the textile business actually buys, makes, and ships goods.",
+                "Accounting & inventory domain depth: Built a practical understanding of invoicing, payments, stock movements, and costing—translating shop-floor and finance rules into reliable system behavior instead of generic templates.",
+                "Internal tools for operations: Delivered and maintained reporting and operational tools finance and plant teams used daily, tightening visibility into production, stock positions, and cost drivers when decisions had to be fast.",
+                "In-house UI framework & SPA platform: Contributed significantly to a company-wide JavaScript single-page-application stack and an internal web UI component framework—helping standardize new screens on that platform and supporting fellow engineers with integration guidance, troubleshooting, and hands-on technical help as teams adopted it."
             ]
         }
     ],

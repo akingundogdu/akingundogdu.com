@@ -2,7 +2,7 @@
 import { Image } from 'astro:assets';
 import { Icon } from 'astro-icon/components';
 import heroImage from '../../assets/profile.png';
-import { basic, socialLinks, technologyStack } from '../../config/cv.json';
+import { basic, technologyStack } from '../../config/cv.json';
 ---
 
 <section class="py-5 px-4 sm:py-10 lg:py-16">
@@ -27,79 +27,129 @@ import { basic, socialLinks, technologyStack } from '../../config/cv.json';
                     {basic?.summary}
                 </p>
 
-                <div class="mt-10 flex flex-wrap items-center gap-4">
-                    {basic?.email && (
-                        <a href={`mailto:${basic.email}`} title="Hire me"
-                            class="inline-flex items-center justify-center px-10 py-4 text-base text-white
-                                font-semibold transition-all duration-200 rounded
-                                bg-primary hover:bg-secondary focus:bg-secondary" role="button">
-                            Hire me
-                        </a>
-                    )}
+                <div class="mt-10 flex w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-4">
+                    <div class="flex flex-wrap items-center gap-4">
+                        {basic?.email && (
+                            <a href={`mailto:${basic.email}`} title="Hire me"
+                                class="inline-flex items-center justify-center border border-transparent px-7 py-2.5 text-sm text-white
+                                    font-semibold transition-all duration-200 rounded
+                                    bg-primary hover:bg-secondary focus:bg-secondary" role="button">
+                                Hire me
+                            </a>
+                        )}
 
-                    <a
-                        href="https://calendly.com/akin-gundogdu-dev/let-s-meet-and-chat"
-                        title="Contact me"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="inline-flex items-center justify-center px-10 py-4 text-base
-                            font-semibold transition-all duration-200 rounded
-                            border border-primary text-primary
-                            hover:bg-primary hover:text-white
-                            focus:bg-primary focus:text-white"
-                        role="button"
-                    >
-                        Contact me
-                    </a>
+                        <a
+                            href="https://calendly.com/akin-gundogdu-dev/let-s-meet-and-chat"
+                            title="Contact me"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex items-center justify-center border border-transparent px-7 py-2.5 text-sm text-white
+                                font-semibold transition-all duration-200 rounded
+                                bg-primary hover:bg-secondary focus:bg-secondary"
+                            role="button"
+                        >
+                            Contact me
+                        </a>
+                    </div>
                 </div>
 
-                {socialLinks?.length > 0 && (
-                    <ul class="mt-8 flex items-center gap-6">
-                        {socialLinks.map(social => (
-                            <li>
-                                <a href={social.link} title={social.iconName} target="_blank" rel="noopener noreferrer"
-                                   class="block text-default transition-all duration-300 hover:text-primary focus:text-primary">
-                                    <Icon name={social.iconName} class="w-6 h-6" />
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-
                 {technologyStack?.length > 0 && (
-                    <div class="mt-6 space-y-3">
+                    <div class="mt-6 tech-stack-root min-w-0">
                         <p class="text-xs text-offset uppercase tracking-wide">Tech stack</p>
-                        {technologyStack.map((section) => (
-                            <div>
-                                <p class="text-[10px] font-semibold text-primary/90 mb-1 uppercase tracking-wider">
+                        <div
+                            class="mt-2 flex flex-wrap gap-1 border-b border-default"
+                            role="tablist"
+                            aria-label="Technology stack categories"
+                        >
+                            {technologyStack.map((section, i) => (
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    id={`tech-stack-tab-${i}`}
+                                    class="tech-stack-tab px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider
+                                           rounded-t-md border-b-2 border-transparent -mb-px transition-colors
+                                           text-offset hover:text-default
+                                           aria-selected:text-primary aria-selected:border-primary
+                                           focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                    aria-selected={i === 0 ? 'true' : 'false'}
+                                    aria-controls={`tech-stack-panel-${i}`}
+                                    tabindex={i === 0 ? 0 : -1}
+                                    data-tech-tab={i}
+                                >
                                     {section.category}
-                                </p>
-                                <ul class="flex flex-wrap items-start gap-1.5">
-                                    {section.items.map((tech) => (
-                                        <li>
-                                            <a
-                                                href={tech.link}
-                                                title={tech.name}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="group flex flex-col items-center gap-0.5 rounded-md
-                                                       bg-background/60 px-1.5 py-1 min-w-[3.75rem] max-w-[4.75rem]
-                                                       text-offset transition-colors duration-200
-                                                       hover:text-primary
-                                                       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                            >
-                                                <Icon
-                                                    name={tech.icon}
-                                                    class="h-4 w-4 shrink-0 text-current"
-                                                    aria-hidden="true"
-                                                />
-                                                <span class="text-center text-[9px] font-medium leading-tight text-current">
-                                                    {tech.name}
-                                                </span>
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
+                                </button>
+                            ))}
+                        </div>
+                        {technologyStack.map((section, i) => (
+                            <div
+                                class="tech-stack-panel min-w-0 pt-2"
+                                id={`tech-stack-panel-${i}`}
+                                role="tabpanel"
+                                aria-labelledby={`tech-stack-tab-${i}`}
+                                {...(i > 0 ? { hidden: true } : {})}
+                            >
+                                <div class="tech-stack-scroll-outer relative -mx-1 min-w-0 rounded-md">
+                                    <ul
+                                        role="list"
+                                        aria-label={`${section.category} technologies — scroll horizontally`}
+                                        class="tech-stack-scroll flex flex-nowrap items-start gap-1.5 overflow-x-auto overscroll-x-contain scroll-smooth
+                                               py-0.5 pl-1 pr-1 pb-1
+                                               [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent]
+                                               [-webkit-overflow-scrolling:touch]"
+                                    >
+                                        {section.items.map((tech) => (
+                                            <li class="shrink-0">
+                                                <a
+                                                    href={tech.link}
+                                                    title={tech.name}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="group flex flex-col items-center gap-0.5 rounded-md
+                                                           bg-background/60 px-1.5 py-1 w-[4.25rem] sm:w-[4.5rem]
+                                                           text-offset transition-colors duration-300 ease-out
+                                                           hover:text-default
+                                                           focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+                                                           focus-visible:outline-[color:color-mix(in_oklab,var(--color-text)_45%,transparent)]"
+                                                >
+                                                    <Icon
+                                                        name={tech.icon}
+                                                        class="h-4 w-4 shrink-0 text-current"
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span class="text-center text-[9px] font-medium leading-tight text-current line-clamp-2">
+                                                        {tech.name}
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <div
+                                        class="tech-stack-edge tech-stack-edge--left pointer-events-none absolute inset-y-0.5 left-0 z-10 w-10 opacity-0 transition-opacity duration-200"
+                                        aria-hidden="true"
+                                    >
+                                        <div
+                                            class="absolute inset-0 bg-gradient-to-r from-[var(--color-background)] from-10% via-[var(--color-background)]/90 to-transparent"
+                                        />
+                                        <span
+                                            class="relative flex h-full items-center pl-0.5 text-sm leading-none text-primary/45"
+                                        >
+                                            ‹
+                                        </span>
+                                    </div>
+                                    <div
+                                        class="tech-stack-edge tech-stack-edge--right pointer-events-none absolute inset-y-0.5 right-0 z-10 w-10 opacity-0 transition-opacity duration-200"
+                                        aria-hidden="true"
+                                    >
+                                        <div
+                                            class="absolute inset-0 bg-gradient-to-l from-[var(--color-background)] from-10% via-[var(--color-background)]/90 to-transparent"
+                                        />
+                                        <span
+                                            class="relative flex h-full items-center justify-end pr-0.5 text-sm leading-none text-primary/45"
+                                        >
+                                            ›
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -108,3 +158,105 @@ import { basic, socialLinks, technologyStack } from '../../config/cv.json';
         </div>
     </div>
 </section>
+
+<style is:global>
+    .tech-stack-scroll::-webkit-scrollbar {
+        height: 5px;
+    }
+    .tech-stack-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .tech-stack-scroll::-webkit-scrollbar-thumb {
+        background: var(--color-border);
+        border-radius: 9999px;
+    }
+</style>
+
+<script>
+    function updateScrollEdges(ul: HTMLElement) {
+        const outer = ul.closest('.tech-stack-scroll-outer');
+        if (!outer) return;
+
+        const right = outer.querySelector<HTMLElement>('.tech-stack-edge--right');
+        const left = outer.querySelector<HTMLElement>('.tech-stack-edge--left');
+        const { scrollLeft, scrollWidth, clientWidth } = ul;
+        const overflow = scrollWidth > clientWidth + 1;
+        const atEnd = scrollLeft >= scrollWidth - clientWidth - 2;
+        const atStart = scrollLeft <= 2;
+
+        const showRight = overflow && !atEnd;
+        const showLeft = overflow && !atStart;
+
+        if (right) {
+            right.classList.toggle('opacity-0', !showRight);
+            right.classList.toggle('opacity-100', showRight);
+        }
+        if (left) {
+            left.classList.toggle('opacity-0', !showLeft);
+            left.classList.toggle('opacity-100', showLeft);
+        }
+    }
+
+    function bindScrollEdges(root: Element) {
+        root.querySelectorAll<HTMLElement>('.tech-stack-scroll').forEach((ul) => {
+            const onUpdate = () => updateScrollEdges(ul);
+            ul.addEventListener('scroll', onUpdate, { passive: true });
+            const ro = new ResizeObserver(onUpdate);
+            ro.observe(ul);
+            onUpdate();
+        });
+    }
+
+    function refreshVisiblePanelEdges(root: Element) {
+        requestAnimationFrame(() => {
+            root.querySelectorAll<HTMLElement>('.tech-stack-panel:not([hidden]) .tech-stack-scroll').forEach((ul) => {
+                updateScrollEdges(ul);
+            });
+        });
+    }
+
+    function initTechStackTabs() {
+        const root = document.querySelector('.tech-stack-root');
+        if (!root) return;
+
+        const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tech-tab]'));
+        const panels = Array.from(root.querySelectorAll<HTMLElement>('.tech-stack-panel'));
+        if (!tabs.length || tabs.length !== panels.length) return;
+
+        bindScrollEdges(root);
+
+        function selectTab(index: number) {
+            tabs.forEach((tab, j) => {
+                const on = j === index;
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+                tab.tabIndex = on ? 0 : -1;
+                panels[j].toggleAttribute('hidden', !on);
+            });
+            refreshVisiblePanelEdges(root);
+        }
+
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
+                selectTab(Number(tab.dataset.techTab));
+            });
+        });
+
+        root.querySelector('[role="tablist"]')?.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+            const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
+            if (i === -1) return;
+            e.preventDefault();
+            let next = e.key === 'ArrowRight' ? i + 1 : i - 1;
+            if (next < 0) next = tabs.length - 1;
+            if (next >= tabs.length) next = 0;
+            selectTab(next);
+            tabs[next]?.focus();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTechStackTabs);
+    } else {
+        initTechStackTabs();
+    }
+</script>
