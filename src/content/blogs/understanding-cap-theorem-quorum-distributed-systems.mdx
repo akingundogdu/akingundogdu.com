@@ -1,0 +1,278 @@
+---
+title: "Understanding CAP Theorem and Quorum in Distributed Systems"
+description: "If you are passionate about backend architecture and enjoy working with distributed systems, mastering the CAP theorem and quorum is essential. I've encountered numerous questions regarding this topic during some interviews, and I want to provide details in case anyone is interested in learning more"
+datetime: "2025-01-11"
+image: "https://media.licdn.com/dms/image/v2/D4D12AQFAlm4QLZ0p4g/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1736555885632?e=2147483647&v=beta&t=ILknRBPG3avLcg9UTqta-vO0V6KJz48ueZvVPhlW96s"
+---
+
+If you are passionate about **backend** architecture and enjoy working with distributed systems, mastering the CAP theorem and quorum is essential. I've encountered numerous questions regarding this topic during some interviews, and I want to provide details in case anyone is interested in learning more about it.
+
+Achieving reliability and consistency in distributed systems and databases is inherently complex, but a solid grasp of these concepts is indispensable for architects, managers, and users of such systems. This article provides an in-depth exploration of these foundational concepts, underlining their critical importance with real-world examples.
+
+## What is the CAP Theorem?
+
+The **CAP** theorem, introduced by [Eric Brewer](https://en.wikipedia.org/wiki/Eric_Brewer_(scientist)), is a fundamental principle in distributed systems theory. It asserts that a distributed system ***can only guarantee two out of the following three*** properties simultaneously:
+
+1. **C**onsistency
+2. **A**vailability
+3. **P**artition Tolerance
+
+Understanding these concepts helps in designing and managing distributed systems by highlighting the trade-offs that need to be considered. Here's a closer look at each property:
+
+### Consistency
+
+Consistency refers to the requirement that every read operation returns the most recent write result. In a distributed system, consistency ensures that all nodes have the same data at any given time. When a change is made to the data, it is immediately visible to all nodes, and every **read operation will reflect the latest write.**
+
+**Real-World Example:**
+
+In a banking system, if you transfer money from one account to another, the balance should be updated across all branches and ATMs simultaneously. If you check your account balance from different locations or devices, you should see the same updated amount.
+
+**Characteristics:**
+
+**Immediate Consistency:** Changes are immediately visible across the system.
+
+**Strong Consistency:** Guarantees that once a write is committed, all future reads will reflect that write.
+
+**Challenges:**
+
+Maintaining consistency can be challenging in systems with high latency or network partitions, as it requires synchronizing all nodes.
+
+### Availability
+
+Availability refers to the system's ability to respond to requests, even if some nodes or parts of the system are down. It ensures that every request receives a response, either with the requested data or an error message. Availability means that the system remains operational and accessible for reading and writing operations.
+
+**Real-World Example:**
+
+A social media platform like Facebook aims to be highly available, meaning users can post updates, comment, and like posts even if some of the servers are temporarily unavailable. The system is designed to ensure that users can interact with the **platform without interruption.**
+
+**Characteristics:**
+
+**High Uptime:** The system is always available for operations.
+
+**Fault Tolerance:** The system can handle failures of individual nodes without affecting overall availability.
+
+**Challenges:**
+
+Ensuring high availability may lead to temporary data inconsistencies, as some nodes might not have the latest updates.
+
+### Partition Tolerance
+
+Partition Tolerance is the system's ability to continue operating despite network partitions or communication failures between nodes. In a distributed system, partitions can occur due to network issues, which can split the network into isolated segments. A partition-tolerant system can still function and handle requests even when communication between some nodes is lost.
+
+**Real-World Example:**
+
+Consider a distributed database system where network partitions occur between different data centers. Despite these partitions, the system continues to process read and write requests. For instance, if a user writes data to one data center, that data is not immediately visible in other data centers, but the system remains operational and accepts further requests.
+
+**Characteristics:**
+
+**Resilience:** The system can handle network failures and still function.
+
+**Operational Continuity:** The system continues to operate even if some parts are unreachable.
+
+**Challenges:**
+
+Maintaining partition tolerance often requires making trade-offs in consistency or availability.
+
+## Do you want more detail? If the answer is yes, let's continue..
+
+## The CAP Theorem: Balancing Trade-offs
+
+As I said above, the CAP theorem states that a distributed system can only guarantee two out of the following three properties at any given time. Let's look at two possible scenarios and try to understand them with real examples;
+
+### 1. Consistency + Availability (CA)
+
+**Real-World Example: Traditional Banking Systems**
+
+**Scenario:** Checking Account Balance
+
+Imagine an online banking system that allows users to check their account balances, transfer money, and perform other financial transactions. This system needs to ensure that account balances are consistently accurate and available for users to view and manage.
+
+**Scenario Details:**
+
+**1. Checking Account Balance:**
+
+A user logs into their online banking account and checks their balance. The system must ensure that the balance shown is up-to-date and reflects the latest transactions. This requires consistency, meaning that all users see the same balance if they access the account at the same time.
+
+**2. Performing Transactions:**
+
+The system needs to handle various transactions such as money transfers, deposits, and withdrawals. It must ensure that these transactions are processed accurately and consistently, and that the updated balances are immediately available to all users.
+
+**How It Works:**
+
+**1. Consistency:** When a transaction (e.g., a money transfer) is processed, the system updates the account balance immediately. Every user querying the balance will see the same updated value, ensuring that there is no discrepancy in the data. All changes are synchronized across the system, so there are no inconsistencies.
+
+**2. Availability:** The system remains operational and responsive, allowing users to check their balances and perform transactions at any time. Even if there are high volumes of requests or some minor system issues, the service is designed to be available, ensuring that users can always access their account information.
+
+**Example Outcome:**
+
+- User A checks their account balance after transferring money to another account. The balance displayed is immediately updated to reflect the transfer, ensuring consistency.
+- User B logs in at the same time and sees the same updated balance. The system guarantees that all users see the same data, maintaining consistency and availability throughout.
+
+**Why This Example Fits:**
+
+- Consistency ensures that the account balance shown to every user is the same and reflects the most recent transactions accurately.
+- Availability ensures that users can always access their account information and perform transactions, regardless of system load or minor issues.
+
+**Real-World Limitations**
+
+In practice, achieving both consistency and availability can be challenging, especially in the presence of network partitions or high system loads. Systems that prioritize these two aspects might struggle to handle partitions gracefully as they focus on providing a consistent and always available service.
+
+This example demonstrates how an online banking system must balance providing accurate, consistent information with maintaining high availability for its users.
+
+---
+
+### 2. Consistency + Partition Tolerance (CP)
+
+**Real-World Example: Online Ticket Booking Systems**
+
+**Scenario:** Booking Train Tickets
+
+Imagine an online ticket booking system used for reserving train tickets. This system is designed to handle a high volume of user interactions, including searches, reservations, and purchases, across multiple geographical locations.
+
+**Scenario Details:**
+
+**1. Booking a Train Ticket:**
+
+- A user searches for available train tickets and selects a specific train for their travel. The system needs to ensure that the availability of tickets is accurate and up-to-date.
+- If multiple users are trying to book the same train at the same time, the system must guarantee that the ticket availability is consistently updated to reflect the latest status.
+
+**2. Partition Tolerance:**
+
+- The system is distributed across multiple data centers to handle high traffic and ensure reliability. Suppose there's a network partition causing communication issues between data centers.
+- Even during such network partitions, the system should continue to allow users to search and book tickets, ensuring that users in different regions can still interact with the system.
+
+**How It Works:**
+
+**1. Consistency:** When a ticket is booked, the system updates the availability status in all data centers to reflect that the ticket has been sold. If the system had strong consistency guarantees, every user querying the ticket availability would see the most up-to-date status, ensuring no double bookings or outdated information.
+
+**2. Partition Tolerance:** If a network partition occurs between different data centers, the system continues to operate and accept bookings. The distributed nature of the system allows it to handle the partition and provide services to users, even if some data centers cannot communicate with others temporarily.
+
+**Example Outcome:**
+
+- User A tries to book a ticket for a train, and the system reflects that there are still tickets available. The booking is processed, and the ticket is marked as sold in the system.
+- User B from another location tries to book the same ticket. Thanks to the consistency guarantees, User B will see that the ticket is no longer available, even if there were network issues during the booking process.
+- Despite network partitions, the system ensures that Users A and B experience a consistent view of ticket availability, and the system continues to function, allowing users to book tickets without major disruptions.
+
+**Why This Example Fits:**
+
+- Consistency ensures that users don't book the same ticket multiple times by keeping the ticket availability status synchronized across all data centers.
+- Partition Tolerance allows the system to remain operational and handle requests even when parts of the network are not communicating properly.
+
+This example illustrates how a real-world online ticket booking system balances consistency and partition tolerance, ensuring that users have a reliable and accurate booking experience regardless of network issues.
+
+---
+
+### 3. Availability + Partition Tolerance (AP)
+
+**Real-World Example: Social Media Platforms**
+
+**Scenario:** Posting and Viewing Content
+
+Imagine a social media platform like Twitter or Facebook, where users can post updates, like, comment, and interact with content. This system is designed to be highly available and resilient to network partitions, allowing users to continue interacting with the platform even in the face of connectivity issues.
+
+**Scenario Details:**
+
+**1. Posting Updates:**
+
+A user posts an update on their profile. This update needs to be visible to their friends and followers. The system must ensure that the post is accepted and displayed even if some servers are temporarily unreachable.
+
+**2. Network Partition:**
+
+Suppose there is a network partition that isolates some of the servers handling user interactions. Despite this partition, the system must continue to operate and allow users to post new updates and interact with existing content.
+
+**How It Works:**
+
+**1. Availability:** The system is designed to ensure that every request (posting, liking, commenting) receives a response. Even if some servers are down or disconnected due to a network partition, the platform remains operational and users can still perform actions such as posting updates or commenting on posts.
+
+**2. Partition Tolerance:** During a network partition, where some servers cannot communicate with others, the system continues to function. Users in different regions or on different parts of the network can still interact with the platform. Data might be temporarily inconsistent due to the partition, but the system ensures that operations continue without major disruptions.
+
+**Example Outcome:**
+
+- User A posts a new update. Even if there is a network partition affecting certain data centers or servers, the update is successfully posted and visible to users connected to the same data center.
+- User B from another region sees the update shortly after it is posted, even if their data center was isolated during the network partition. However, there might be a slight delay or temporary inconsistency in seeing the post, depending on when the partition is resolved.
+
+**Why This Example Fits:**
+
+- Availability ensures that users can continue to post updates and interact with the platform without interruption, even when parts of the system are unreachable.
+- Partition Tolerance allows the platform to handle network issues gracefully, maintaining operation and user experience despite communication failures between different parts of the network.
+
+This example highlights how a social media platform maintains high availability and resilience to network partitions, allowing users to interact with the system continuously while handling temporary inconsistencies.
+
+---
+
+### If you want to dive deep, continue..
+
+## What is Quorum?
+
+Quorum is a technique used in distributed systems to manage the trade-offs between consistency, availability, and partition tolerance. It refers to the minimum number of nodes that must agree on an operation for it to be considered valid.
+
+## Quorum Types
+
+**1. Write Quorum (W):**
+
+Write Quorum (W) refers to the minimum number of nodes in a distributed system that must acknowledge and successfully store a write operation before that write is considered completed and committed. This concept is essential in ensuring data consistency and reliability across the distributed system.
+
+**2. Read Quorum (R):**
+
+Read Quorum (R) refers to the minimum number of nodes that must be contacted to read data in a distributed system. It ensures that the data retrieved is up-to-date and reflects the most recent write operations. By querying a sufficient number of nodes, it ensures that the read operation provides a consistent view of the data.
+
+### Real-World Example: E-Commerce Platforms
+
+**Scenario: Product Stock Management**
+
+Let's consider an e-commerce platform. This platform keeps a product's stock status in a distributed database across multiple data centers. Each data center stores information about this product on its own nodes. The system uses a quorum-based consistency model to ensure the consistency of this information.
+
+### 1. System Setup:
+
+**Data Centers:** Product stock is kept in 3 different data centers
+
+- A (Turkey)
+- B (Germany)
+- C (United States)
+
+**Nodes:** Product stock information is stored in 5 different nodes in each data center. There are 15 nodes in total.
+
+**Quorum Values:**
+
+- Write Quorum (W): 3
+- Read Quorum (R): 2
+
+### 2. Scenario: Stock Update
+
+A customer purchases a product from the platform, initiating a write transaction that reduces the product's stock amount.
+
+**Write Transaction:**
+
+- When a customer purchases a product, its stock must be updated. The system needs approval from 3 nodes to make this update (Write Quorum = 3).
+- The database system sends an update request to the nodes in the data centers. Let's say, a total of 5 nodes receive this update, two nodes from centers A and B, and one node from center C.
+- At least 3 of these 5 nodes (Quorum) successfully record the update, and the system accepts that this update is valid.
+
+### 3. Scenario: Stock Check
+
+Another customer plans to buy the same product and checks if the stock is still available before adding the product to the cart.
+
+**Read Process:**
+
+- When the customer arrives at the product page, the system checks if the product stock is available. It needs to get data from 2 nodes for this information (Read Quorum = 2).
+- Let's say data is received from one node from centers A and B. Since these two nodes reflect the correct stock that was updated earlier, the customer can see that the stock is still available.
+
+### 4. Scenario: Network Partition
+
+Now, let's assume that a network partition occurs between data centers. In this case, the data centers cannot communicate with each other, but each can still update its own nodes.
+
+**Write and Read Operations:**
+
+- One of the nodes in center A receives a new stock update transaction. However, due to the quorum requirement (W = 3), the update transaction must receive confirmation from 3 nodes in center A in order to be valid.
+- At the same time, a node in center B initiates a read transaction to check the stock. It receives confirmation from 2 nodes in center B (R = 2), but these nodes may not display the current stock due to the network partition. This may cause temporary inconsistencies until communication between the data centers is restored.
+
+In this scenario, Quorum is used to ensure data consistency and reliability in a distributed database. The system determines the number of quorums to manage possible problems such as network partitions. This way, an update or read requires confirmation from a certain number of nodes before it can be considered valid. However, when the quorum value is high, transactions may take longer to complete, which can have an impact on system performance.
+
+## Summary
+
+In backend engineering, just like every other stage of architecture, it is crucial to establish a system architecture that fits the product and the business. When considering the CAP theorem, you should select a product that meets your customer's needs. Making the right decisions and setting up the right system without being limited to any specific pattern, architecture, technology, or framework is a fundamental aspect of professionalism. I hope the article you've just read will be beneficial for setting up the systems in the future.
+
+Enjoy your successes.
+
+---
+
+*Originally published on [LinkedIn Pulse](https://www.linkedin.com/pulse/understanding-cap-theorem-quorum-distributed-systems-akin-gundogdu-prbcf/).*
