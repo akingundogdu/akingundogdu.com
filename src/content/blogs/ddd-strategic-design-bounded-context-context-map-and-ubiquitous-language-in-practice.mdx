@@ -1,0 +1,139 @@
+---
+title: "DDD Strategic Design: Bounded Context, Context Map, and Ubiquitous Language in Practice"
+description: "A practical guide to applying DDD strategic design concepts, with insights on bounded contexts, context maps, and ubiquitous language from real-world projects."
+datetime: "2022-12-26"
+image: ""
+---
+
+When we first decided to apply Domain-Driven Design (DDD) to our e-commerce platform, we knew it would be a challenging but rewarding journey. Our monolith system was creaking under the weight of new features, each demanding a rethink in architecture. This wasn't a trivial task; defining bounded contexts and establishing context maps felt somewhat abstract until we started diving deep with EventStorming workshops. Here's how we tackled these challenges in a production environment.
+
+## Understanding Bounded Contexts
+
+### Defining Explicit Boundaries
+
+In our e-commerce platform, we realized the need for explicit boundaries when our user management logic started interfering with order processing. The bounded context approach helped us untangle these dependencies. A bounded context is essentially a specific responsibility boundary where a particular model is defined and applicable.
+
+Why did we choose to establish a clear boundary? Think of it as drawing a line in the sand — within a bounded context, terms have specific meanings that should not conflict with meanings in another context. Imagine calling a "Product" in both the inventory and the sales contexts. Without clear distinction, misunderstandings crop up.
+
+### Identifying Context Boundaries
+
+We discovered that splitting domains isn't just about technical considerations. Organizational factors play a huge role. We identified contexts by first understanding team structures: marketing, order processing, and inventory management. Each had its lingo and requirements.
+
+#### Heuristics for Splitting Domains
+
+- **Team Expertise**: Align contexts with existing team knowledge.
+- **Rate of Change**: Separate areas that change frequently from stable parts.
+- **Dependency**: Limit hard dependencies between contexts.
+
+### Evolving Boundaries
+
+Over time, we noticed that as teams grew and responsibilities shifted, the boundaries we initially set required adjustments. A shared kernel between marketing and sales had to be split as each team started diverging in terms of goals and technology stack.
+
+## Context Mapping Patterns
+
+To communicate how contexts interact, we used context maps. This helped us visualize dependencies and integration points clearly.
+
+### Anti-Corruption Layer (ACL)
+
+One of our integrations involved a legacy payment service that we couldn't modify. To prevent its archaic practices from polluting newer systems, we encapsulated it within an ACL.  
+
+```typescript
+class PaymentServiceACL {
+    processPayment(order: Order, method: PaymentMethod): PaymentResult {
+        try {
+            // Adapt order to legacy format
+            const legacyOrder = this.mapToLegacyOrder(order);
+            // Call legacy service
+            return legacyPaymentAPI.process(legacyOrder, method);
+        } catch (error) {
+            console.error('An error occurred while processing payment', error);
+            throw new PaymentProcessingError('Failed to process payment');
+        }
+    }
+
+    mapToLegacyOrder(order: Order): LegacyOrder {
+        // Transformation logic
+    }
+}
+```
+
+### Open Host Service (OHS) and Shared Kernel
+
+To allow other systems to interact with our order processing without tight coupling, we established an OHS. Meanwhile, a shared kernel was used between closely related contexts, like inventory and shipping, but it needed strict control to prevent becoming a dumping ground for half-baked ideas.
+
+## Ubiquitous Language
+
+### Building a Shared Vocabulary
+
+A significant part of our journey involved frequent interactions with domain experts to build a ubiquitous language. This shared vocabulary became pivotal in reducing miscommunication. For instance, agreeing on what "fulfillment" entailed across the board.
+
+#### Glossary Maintenance
+
+Keeping a glossary updated was not trivial. It required regular touchpoints and sometimes negotiations to include new terms, retiring old ones gracefully.
+
+### EventStorming Workshops
+
+Facilitating domain discovery through EventStorming workshops was a revelation. Getting domain experts and developers (all in one room, with colored sticky notes) gave us breakthroughs in understanding the business flow — from order placement to delivery.
+
+These workshops helped us identify that many of our miscommunications stemmed from divergent interpretations of common terms. By visually mapping out events, we discovered multiple points of friction which could then be addressed.
+
+### Facilitation Tips
+
+- **Big Picture to Design Level**: Start broad and then narrow down the focus.
+- **Involve the Right People**: Ensure diverse representation from all domains.
+- **Be Prepared for Surprises**: Keep an open mind; the process can reveal unexpected insights.
+
+## Real-World Example: E-commerce Domain Mapping
+
+Mapping our domain was enlightening. We separated out contexts like Customer, Order, Product, Shipping, and Payment. Each bounded context became a microservice with its data model and language.
+
+```typescript
+// Example of bounded context for Order
+class OrderService {
+    constructor(private orderRepository: OrderRepository) {}
+
+    createOrder(customerId: string, items: OrderItem[]): Order {
+        if (!this.validateStockAvailability(items)) {
+            throw new OutOfStockError('One or more items are out of stock');
+        }
+
+        const order = new Order(customerId, items);
+        this.orderRepository.save(order);
+        return order;
+    }
+
+    validateStockAvailability(items: OrderItem[]): boolean {
+        // Check stock from Product context
+    }
+}
+```
+
+## The Gotcha / Lessons Learned
+
+### Model Drift
+
+In the real world, our context models sometimes drifted due to evolving business needs. This came to a head when changes in the sales context rippled into order processing, causing compatibility issues.
+
+**Lesson Learned**: Regularly review and refactor boundaries as the organization and domain evolve. Keep alignment meetings to sync changes across teams.
+
+### Communication Overhead
+
+We faced communication overhead as more contexts meant more inter-context communication. Some days, it felt like endless API contracts and debates over slight deviations.
+
+**Lesson Learned**: Balance the independence of contexts with cohesive communication strategies, perhaps through shared events and contracts.
+
+### Overzealous Division
+
+Initially, we split every tiny function into separate services, but maintenance and integration became unwieldy.
+
+**Lesson Learned**: Resist over-dividing. Start with broader contexts and iteratively refine them. Pragmatism over purity.
+
+## Closing
+
+To sum up, Domain-Driven Design is an investment that pays off by bringing clarity to complex systems through well-defined boundaries and shared understanding. It requires commitment and collaboration across teams, but when done right, the benefits far outweigh the challenges.
+
+- Start with a high-level understanding before diving into granular details.
+- Conduct regular reviews of your bounded contexts and adjust as needed.
+- Maintain a living glossary to prevent communication gaps.
+
+Thanks for reading. If you found this useful or have questions, feel free to reach out—I always enjoy talking architecture. See you in the next one.
