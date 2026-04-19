@@ -1,0 +1,392 @@
+---
+title: "Event-Driven Architecture: Async Communication with Kafka, RabbitMQ, and NATS"
+description: "A practical comparison of Kafka, RabbitMQ, and NATS for microservice communication — covering delivery guarantees, partitioning, dead letters, and when to pick which based on real production experience."
+datetime: "2025-01-14"
+image: ""
+---
+
+I've run all three of these in production at different scales. Kafka for a high-throughput order pipeline doing 3M events/second. RabbitMQ for a notification system that needed complex routing. NATS for internal service-to-service communication where latency mattered more than durability. Each choice was deliberate, and each came with trade-offs I didn't fully appreciate until things broke.
+
+Here's what I've learned about picking and operating message brokers in event-driven architectures.
+
+## The Core Question: What Are You Optimizing For?
+
+Before comparing features, ask yourself:
+
+- **Throughput?** How many messages per second?
+- **Latency?** Sub-millisecond or "good enough"?
+- **Durability?** Can you afford to lose messages?
+- **Ordering?** Does sequence matter?
+- **Complexity budget?** How much operational overhead can your team absorb?
+
+Your answers narrow the field quickly. Let me show you how.
+
+## Kafka: The Distributed Log
+
+Kafka isn't really a message queue — it's a distributed, append-only log. This fundamental difference shapes everything about how you use it.
+
+### When I Reach for Kafka
+
+- Event streams that need replay (event sourcing, audit trails)
+- High throughput (millions of messages/second)
+- Multiple consumers that need independent read positions
+- Data pipelines feeding analytics, search indices, or data lakes
+
+### Partitioning and Consumer Groups
+
+This is Kafka's killer feature. A topic is split into partitions, and each partition is an ordered, immutable sequence of messages:
+
+```typescript
+import { Kafka, Partitioners } from 'kafkajs';
+
+const kafka = new Kafka({ brokers: ['localhost:9092'] });
+const producer = kafka.producer({
+  createPartitioner: Partitioners.DefaultPartitioner,
+});
+
+await producer.connect();
+
+await producer.send({
+  topic: 'orders',
+  messages: [
+    {
+      key: order.userId,  // same user always goes to same partition
+      value: JSON.stringify({
+        type: 'ORDER_CREATED',
+        payload: { orderId: order.id, items: order.items },
+        timestamp: Date.now(),
+      }),
+    },
+  ],
+});
+```
+
+The `key` determines which partition receives the message. Same key = same partition = guaranteed ordering for that key. I use the entity ID (user ID, order ID) as the key so all events for one entity are processed in order.
+
+Consumer groups allow parallel processing:
+
+```typescript
+const consumer = kafka.consumer({ groupId: 'order-processor' });
+await consumer.connect();
+await consumer.subscribe({ topic: 'orders', fromBeginning: false });
+
+await consumer.run({
+  eachMessage: async ({ topic, partition, message }) => {
+    const event = JSON.parse(message.value.toString());
+    
+    try {
+      await processEvent(event);
+      // offset commits automatically in this mode
+    } catch (error) {
+      // don't commit — message will be redelivered
+      throw error;
+    }
+  },
+});
+```
+
+Each consumer in the group gets assigned a subset of partitions. Add more consumers (up to partition count) to scale horizontally.
+
+### Delivery Guarantees
+
+- **At-most-once:** Auto-commit offsets before processing. Fast, but you'll lose messages on crashes.
+- **At-least-once:** Commit after processing. You'll get duplicates on redelivery — make your consumers idempotent.
+- **Exactly-once:** Kafka Streams + transactions. Works but adds latency (~100ms overhead) and complexity. I've only needed this once, for financial reconciliation.
+
+### The Gotcha: Consumer Lag
+
+In one project, we deployed a new consumer version with a bug that slowed processing by 10x. Consumer lag shot up to millions of messages. By the time we noticed, the retention period was about to expire and we nearly lost data.
+
+Lesson: **monitor consumer lag aggressively**. Set alerts at thresholds that give you time to react.
+
+```bash
+kafka-consumer-groups.sh --bootstrap-server localhost:9092 \
+  --describe --group order-processor
+```
+
+### Archiving Kafka Logs to S3
+
+One challenge with Kafka at scale is storage cost. Keeping weeks or months of data on broker disks (fast SSDs) gets expensive fast. In one of my projects, we had 3M events/second with a 30-day retention policy — the disk bill alone was painful.
+
+The solution: **tiered storage**. Keep recent data (hot) on local broker disks for fast consumer reads, and push older segments (cold) to S3 in parallel. Consumers reading recent data see zero latency impact, and you get virtually unlimited retention at a fraction of the cost.
+
+If you're on Confluent Platform or a managed Kafka service, tiered storage is a built-in feature. But in a self-managed setup, I've used Kafka Connect with the S3 Sink Connector to stream topic data into S3 as Parquet or JSON files:
+
+```typescript
+// S3 Sink Connector configuration
+const s3SinkConfig = {
+  name: 'orders-s3-archive',
+  'connector.class': 'io.confluent.connect.s3.S3SinkConnector',
+  'tasks.max': '4',
+  'topics': 'orders,payments,shipments',
+  's3.region': 'eu-west-1',
+  's3.bucket.name': 'kafka-event-archive',
+  's3.part.size': '52428800', // 50MB parts
+  'storage.class': 'io.confluent.connect.s3.storage.S3Storage',
+  'format.class': 'io.confluent.connect.s3.format.parquet.ParquetFormat',
+  'partitioner.class': 'io.confluent.connect.storage.partitioner.TimeBasedPartitioner',
+  'path.format': "'year'=YYYY/'month'=MM/'day'=dd/'hour'=HH",
+  'locale': 'en-US',
+  'timezone': 'UTC',
+  'flush.size': '10000',        // flush every 10K records
+  'rotate.interval.ms': '600000', // or every 10 minutes
+};
+```
+
+This gives you a nice S3 directory structure like:
+
+```
+s3://kafka-event-archive/
+  topics/orders/
+    year=2025/month=01/day=14/hour=09/
+      orders+0+0000000000.parquet
+      orders+1+0000000000.parquet
+```
+
+Once the data lands in S3, you can query it with Athena, load it into a data warehouse, or replay events by reading from S3 when you need to reprocess historical data. I've used this pattern to rebuild read models months after the original events were consumed — something that would be impossible with Kafka's default retention alone.
+
+A few things to watch out for:
+
+- **S3 lifecycle policies:** Move archived data to S3 Glacier after 90 days if you rarely need it — storage cost drops to ~$0.004/GB.
+- **Exactly-once delivery to S3:** The S3 Sink Connector handles this, but verify your `flush.size` and `rotate.interval.ms` settings balance latency vs. file count.
+- **Schema consistency:** If your event schemas evolve, Parquet files with mixed schemas become a headache. Pair this with a Schema Registry.
+
+## RabbitMQ: The Smart Broker
+
+RabbitMQ is a traditional message broker — it routes messages intelligently and manages queue state. The broker does the heavy lifting so your consumers don't have to.
+
+### When I Reach for RabbitMQ
+
+- Complex routing requirements (route by content, headers, patterns)
+- Request/reply patterns (RPC over messaging)
+- Priority-based processing
+- Smaller scale (<50K messages/second) where operational simplicity matters
+- Teams already familiar with AMQP
+
+### Exchange Types in Practice
+
+This is where RabbitMQ shines. Different exchange types solve different routing problems:
+
+```typescript
+import amqp from 'amqplib';
+
+const connection = await amqp.connect('amqp://localhost');
+const channel = await connection.createChannel();
+
+// Topic exchange: route by pattern matching
+await channel.assertExchange('events', 'topic', { durable: true });
+
+// Publish with routing key
+channel.publish('events', 'order.created.us', Buffer.from(JSON.stringify({
+  orderId: '123',
+  region: 'us',
+  total: 99.99,
+})), { persistent: true });
+
+// Consumer binds with pattern
+await channel.assertQueue('us-order-processor', { durable: true });
+await channel.bindQueue('us-order-processor', 'events', 'order.*.us');
+await channel.bindQueue('us-order-processor', 'events', 'payment.*.us');
+
+channel.consume('us-order-processor', async (msg) => {
+  if (!msg) return;
+  
+  try {
+    const event = JSON.parse(msg.content.toString());
+    await processEvent(event);
+    channel.ack(msg);
+  } catch (error) {
+    // nack with requeue=false sends to dead letter exchange
+    channel.nack(msg, false, false);
+  }
+});
+```
+
+The routing key `order.*.us` matches `order.created.us`, `order.cancelled.us`, etc. This lets you build very specific consumer subscriptions without code changes — just rebind queues.
+
+### Dead Letter Exchanges
+
+This is my favorite RabbitMQ feature. Failed messages automatically route to a separate exchange where you can inspect, retry, or alert:
+
+```typescript
+// Main queue with DLX configured
+await channel.assertQueue('orders', {
+  durable: true,
+  arguments: {
+    'x-dead-letter-exchange': 'dlx',
+    'x-dead-letter-routing-key': 'orders.dead',
+    'x-message-ttl': 30000, // messages expire after 30s without ack
+  },
+});
+
+// Dead letter queue for inspection
+await channel.assertExchange('dlx', 'direct', { durable: true });
+await channel.assertQueue('orders-dead-letter', { durable: true });
+await channel.bindQueue('orders-dead-letter', 'dlx', 'orders.dead');
+```
+
+I typically build a retry mechanism on top: failed messages go to DLX, a separate consumer picks them up after a delay, and retries up to 3 times before alerting.
+
+### The Gotcha: Memory Pressure
+
+RabbitMQ holds messages in memory (with disk overflow). If consumers fall behind, the broker itself becomes the bottleneck. I've seen production RabbitMQ nodes run out of memory and start dropping connections.
+
+Lesson: **set queue length limits** (`x-max-length`) and configure memory alarms. Better to reject new messages than crash the broker.
+
+## NATS: The Speed Demon
+
+NATS is designed for simplicity and raw speed. Core NATS is fire-and-forget with no persistence — messages that aren't consumed immediately are gone. JetStream adds persistence when you need it.
+
+### When I Reach for NATS
+
+- Internal service communication where speed matters
+- Request/reply patterns with low latency
+- Systems that can tolerate occasional message loss (core NATS)
+- Kubernetes-native environments (NATS has excellent k8s support)
+- When you want minimal operational overhead
+
+### Core NATS: Fire and Forget
+
+```typescript
+import { connect, StringCodec } from 'nats';
+
+const nc = await connect({ servers: 'nats://localhost:4222' });
+const sc = StringCodec();
+
+// Publish — if no subscriber is listening, message is lost
+nc.publish('orders.created', sc.encode(JSON.stringify({
+  orderId: '123',
+  userId: 'user-456',
+})));
+
+// Subscribe with queue group for load balancing
+const sub = nc.subscribe('orders.created', { queue: 'order-processors' });
+
+for await (const msg of sub) {
+  const event = JSON.parse(sc.decode(msg.data));
+  await processOrder(event);
+}
+```
+
+Queue groups are NATS's answer to consumer groups — messages are distributed across subscribers in the same group. Simple, fast, effective.
+
+### JetStream: When You Need Durability
+
+```typescript
+const js = nc.jetstream();
+const jsm = await nc.jetstreamManager();
+
+// Create a stream (like a Kafka topic with retention)
+await jsm.streams.add({
+  name: 'ORDERS',
+  subjects: ['orders.>'],
+  retention: RetentionPolicy.Limits,
+  max_msgs: 1_000_000,
+  max_age: 7 * 24 * 60 * 60 * 1_000_000_000, // 7 days in nanoseconds
+});
+
+// Durable consumer with ack
+const consumer = await js.consumers.get('ORDERS', 'order-processor');
+const messages = await consumer.consume();
+
+for await (const msg of messages) {
+  try {
+    const event = JSON.parse(msg.data.toString());
+    await processEvent(event);
+    msg.ack();
+  } catch (error) {
+    msg.nak(); // will be redelivered
+  }
+}
+```
+
+JetStream gives you Kafka-like semantics (persistence, replay, consumer groups) with NATS's operational simplicity. For new projects, I'd consider JetStream before Kafka unless I know I'll need Kafka's ecosystem (Connect, Streams, Schema Registry).
+
+### The Gotcha: JetStream Ordering
+
+Core NATS has no ordering guarantees at all. JetStream provides ordering within a subject, but if you're using wildcards (`orders.>`), messages across different specific subjects aren't ordered relative to each other.
+
+Lesson: if ordering matters, **use specific subjects as your ordering boundary**, not wildcard subscriptions.
+
+## Comparison Table
+
+| Aspect | Kafka | RabbitMQ | NATS (JetStream) |
+|--------|-------|----------|-------------------|
+| **Throughput** | 1M+ msg/s | ~50K msg/s | ~500K msg/s |
+| **Latency (p99)** | 5-15ms | 1-5ms | <1ms |
+| **Ordering** | Per-partition | Per-queue | Per-subject |
+| **Replay** | Yes (offset-based) | No | Yes (sequence-based) |
+| **Routing** | Topic/partition only | Exchanges + bindings | Subject hierarchy |
+| **Operational cost** | High (ZK/KRaft, brokers) | Medium | Low (single binary) |
+| **Client ecosystem** | Excellent | Excellent | Good, growing |
+| **Best for** | Data pipelines, event sourcing | Complex routing, RPC | Low-latency, k8s-native |
+
+## Schema Evolution: Don't Skip This
+
+Regardless of broker, your messages will change shape over time. Plan for it early:
+
+```typescript
+// Version your events explicitly
+interface OrderCreatedV1 {
+  version: 1;
+  orderId: string;
+  userId: string;
+  items: string[];
+}
+
+interface OrderCreatedV2 {
+  version: 2;
+  orderId: string;
+  userId: string;
+  items: { productId: string; quantity: number; price: number }[];
+  currency: string;
+}
+
+type OrderCreatedEvent = OrderCreatedV1 | OrderCreatedV2;
+
+function handleOrderCreated(event: OrderCreatedEvent) {
+  if (event.version === 1) {
+    // transform v1 to current shape
+    return handleV1(event);
+  }
+  return handleV2(event);
+}
+```
+
+For Kafka specifically, I use Confluent Schema Registry with Avro or Protobuf. For RabbitMQ and NATS, I version in the message payload and handle backwards compatibility in consumer code.
+
+## My Decision Framework
+
+After years of running these in production, here's my shortcut:
+
+**Pick Kafka when:**
+- You need event replay or event sourcing
+- Throughput exceeds 100K messages/second
+- Multiple independent consumers need the same data
+- You have a team that can manage the operational complexity
+
+**Pick RabbitMQ when:**
+- You need complex routing logic
+- Request/reply (RPC) patterns are common
+- Your throughput is moderate (<50K msg/s)
+- You want mature tooling and monitoring out of the box
+
+**Pick NATS when:**
+- Latency is your primary concern
+- You want minimal operational overhead
+- You're in a Kubernetes environment
+- You can tolerate occasional message loss (core) or want Kafka-like features with less complexity (JetStream)
+
+## Practical Advice
+
+A few things I wish someone told me before my first production event-driven system:
+
+- **Start with at-least-once delivery.** Exactly-once is expensive and rarely necessary if your consumers are idempotent.
+- **Dead letter queues are not optional.** Every message that can't be processed needs to go somewhere visible, not silently dropped.
+- **Monitor everything.** Consumer lag (Kafka), queue depth (RabbitMQ), pending messages (NATS). Set alerts before you think you need them.
+- **Schema evolution is a day-one concern.** Your first message format will change within months. Plan for backwards compatibility from the start.
+- **Test failure modes.** Kill brokers, partition networks, slow consumers. Do this in staging before production teaches you the hard way.
+
+---
+
+Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
