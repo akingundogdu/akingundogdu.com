@@ -1,0 +1,492 @@
+---
+title: "DDD Strategic Design: Bounded Context, Context Map, and Ubiquitous Language in Practice"
+description: "How we decomposed a growing e-commerce monolith into bounded contexts using EventStorming, context mapping patterns, and ubiquitous language — with real examples of what worked and what didn't."
+datetime: "2022-12-26"
+image: ""
+---
+
+Our e-commerce monolith had grown to about 400K lines of code, 12 developers across 3 teams, and a deployment pipeline that took 45 minutes. The breaking point came when the marketing team needed to change how "promotions" worked, and the change cascaded into order processing, inventory, and billing. A single-word concept — "promotion" — meant different things in different parts of the system, and nobody realized it until production broke.
+
+That's when we decided to apply Domain-Driven Design strategically. Not the tactical patterns (aggregates, value objects — those came later), but the strategic ones: bounded contexts, context maps, and most importantly, ubiquitous language. It took us about 4 months to get the boundaries right, and we made plenty of mistakes along the way.
+
+## The Problem with a Shared Model
+
+Before DDD, we had one giant `Product` model that tried to serve everyone:
+
+```typescript
+// The god model that tried to be everything
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  costPrice: number;           // finance cares about this
+  stockQuantity: number;       // warehouse cares about this
+  reorderPoint: number;        // warehouse cares about this
+  categoryId: string;          // catalog cares about this
+  seoTitle: string;            // marketing cares about this
+  seoDescription: string;      // marketing cares about this
+  promotionIds: string[];      // marketing cares about this
+  weight: number;              // shipping cares about this
+  dimensions: Dimensions;      // shipping cares about this
+  supplierId: string;          // procurement cares about this
+  leadTimeDays: number;        // procurement cares about this
+  taxCategoryId: string;       // finance cares about this
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+Every team touched this model. When marketing added `seoKeywords`, the migration ran across the entire `products` table (180M rows), locking it for 12 minutes during peak hours. When warehouse needed `binLocation`, the Product service's test suite broke because 40 tests were coupled to the full model shape.
+
+The model was a coupling magnet. Everyone depended on it, and any change required coordinating across teams.
+
+## EventStorming: How We Found Our Boundaries
+
+We ran a Big Picture EventStorming workshop over two days. The entire team — developers, product managers, the head of operations, a customer support lead, and two domain experts from logistics — in one room with a 15-meter paper roll and colored sticky notes.
+
+### The Process
+
+The rules were simple: orange stickies for domain events (past tense, "Order Placed", "Payment Captured"), blue for commands ("Place Order", "Reserve Stock"), yellow for actors ("Customer", "Warehouse Manager"), and pink for hotspots (problems, questions, disagreements).
+
+Within the first hour, we had about 200 orange stickies on the wall. The interesting part wasn't the events themselves — it was where people disagreed. The marketing team's "Product Published" and the catalog team's "Product Listed" turned out to be the same event. But "Order Completed" meant "payment received" to finance and "shipped to customer" to operations. These were the seams.
+
+### What We Discovered
+
+Three patterns emerged from the wall:
+
+1. **Language clusters**: Groups of events that used the same vocabulary. Everything around "catalog", "listing", "category" clustered together. Everything around "shipment", "tracking", "carrier" clustered together. These became our bounded contexts.
+
+2. **Pivot events**: Events where responsibility transferred from one team to another. "Order Placed" was a pivot — before it, the Catalog context owned the flow. After it, the Order Fulfillment context took over.
+
+3. **Hotspot zones**: Areas with the most pink stickies. Our biggest hotspot was "promotion" — marketing, pricing, and order processing all had different models for what a promotion was.
+
+## Defining Our Bounded Contexts
+
+After two days of EventStorming and a week of refinement, we settled on 8 bounded contexts:
+
+```
+Catalog          — product listings, categories, search
+Pricing          — prices, promotions, discounts
+Ordering         — order lifecycle, cart, checkout
+Payment          — payment processing, refunds
+Inventory        — stock levels, reservations, reorder
+Shipping         — fulfillment, carriers, tracking
+Customer         — profiles, addresses, preferences
+Notification     — emails, SMS, push notifications
+```
+
+The key decision was splitting **Catalog** and **Pricing**. Initially we had them as one context, but we realized that the catalog team (marketing-driven, changed weekly) and the pricing team (finance-driven, changed carefully with approval workflows) had fundamentally different rates of change and risk tolerances.
+
+### What "Product" Means in Each Context
+
+This is where ubiquitous language becomes concrete. The same real-world thing — a product — has a different model in each context:
+
+```typescript
+// Catalog context: focused on display and discovery
+interface CatalogProduct {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  categoryPath: string[];
+  attributes: Record<string, string>;
+  images: ProductImage[];
+  status: 'draft' | 'published' | 'archived';
+}
+
+// Pricing context: focused on price rules
+interface PricedItem {
+  productId: string;
+  basePrice: Money;
+  currency: Currency;
+  activePromotions: PromotionRule[];
+  effectivePrice: Money;
+  taxRate: number;
+}
+
+// Inventory context: focused on stock management
+interface StockItem {
+  sku: string;
+  warehouseId: string;
+  quantityOnHand: number;
+  quantityReserved: number;
+  reorderPoint: number;
+  binLocation: string;
+}
+
+// Shipping context: focused on physical properties
+interface ShippableItem {
+  sku: string;
+  weight: Weight;
+  dimensions: Dimensions;
+  requiresSpecialHandling: boolean;
+  hazmatClassification: string | null;
+}
+```
+
+Notice: no single "Product" type anywhere. Each context has exactly the data it needs, using the language that its team speaks. The warehouse team talks about "stock items" and "bin locations", not "products" and "SEO descriptions."
+
+## Context Mapping: How Contexts Talk to Each Other
+
+Once we had bounded contexts, we needed to define how they interact. This is where context mapping patterns come in. We used four patterns across our system:
+
+### Anti-Corruption Layer (ACL)
+
+Our payment processing depended on a third-party gateway with a terrible API — inconsistent naming, XML responses, and error codes that were just numbers with no documentation. We wrapped it in an ACL:
+
+```typescript
+// payment/infrastructure/stripe-acl.ts
+class StripePaymentGatewayACL implements PaymentGateway {
+  constructor(private stripeClient: Stripe) {}
+
+  async capturePayment(request: CapturePaymentRequest): Promise<PaymentResult> {
+    try {
+      const stripeCharge = await this.stripeClient.charges.create({
+        amount: this.toStripeCents(request.amount),
+        currency: request.currency.toLowerCase(),
+        source: request.paymentMethodToken,
+        metadata: {
+          order_id: request.orderId,
+          idempotency_key: request.idempotencyKey,
+        },
+      });
+
+      return this.mapToPaymentResult(stripeCharge);
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeCardError) {
+        return {
+          success: false,
+          status: 'declined',
+          declineReason: this.mapDeclineCode(error.decline_code),
+          gatewayReference: null,
+        };
+      }
+      throw new PaymentGatewayUnavailableError(error.message);
+    }
+  }
+
+  private mapToPaymentResult(charge: Stripe.Charge): PaymentResult {
+    return {
+      success: charge.status === 'succeeded',
+      status: this.mapChargeStatus(charge.status),
+      gatewayReference: charge.id,
+      declineReason: null,
+    };
+  }
+
+  private mapChargeStatus(stripeStatus: string): PaymentStatus {
+    const statusMap: Record<string, PaymentStatus> = {
+      succeeded: 'captured',
+      pending: 'pending',
+      failed: 'failed',
+    };
+    return statusMap[stripeStatus] || 'unknown';
+  }
+
+  private mapDeclineCode(code: string | undefined): string {
+    const declineMap: Record<string, string> = {
+      insufficient_funds: 'Insufficient funds',
+      lost_card: 'Card reported lost',
+      expired_card: 'Card expired',
+    };
+    return declineMap[code || ''] || 'Payment declined';
+  }
+
+  private toStripeCents(amount: Money): number {
+    return Math.round(amount.value * 100);
+  }
+}
+```
+
+The ACL translates between Stripe's language and our Payment context's language. If we switch payment providers, only this class changes. The rest of the Payment context never knows or cares about Stripe-specific concepts.
+
+### Customer/Supplier
+
+The Ordering context is the customer; the Inventory context is the supplier. Ordering needs to know if items are available before confirming an order, but Inventory controls how stock is managed.
+
+```typescript
+// ordering/infrastructure/inventory-client.ts
+class InventoryClient {
+  constructor(private httpClient: HttpClient) {}
+
+  async checkAvailability(
+    items: OrderLineItem[],
+  ): Promise<AvailabilityResult[]> {
+    const response = await this.httpClient.post(
+      'http://inventory-service/api/v1/availability/check',
+      {
+        items: items.map((item) => ({
+          sku: item.sku,
+          requestedQuantity: item.quantity,
+        })),
+      },
+    );
+
+    return response.data.items.map((item: any) => ({
+      sku: item.sku,
+      available: item.available_quantity >= item.requested_quantity,
+      availableQuantity: item.available_quantity,
+    }));
+  }
+
+  async reserveStock(orderId: string, items: OrderLineItem[]): Promise<void> {
+    await this.httpClient.post(
+      'http://inventory-service/api/v1/reservations',
+      {
+        reference_id: orderId,
+        items: items.map((item) => ({
+          sku: item.sku,
+          quantity: item.quantity,
+        })),
+        ttl_minutes: 30,
+      },
+    );
+  }
+}
+```
+
+The Inventory context exposes the API it wants to expose. The Ordering context conforms to that API. If Inventory changes their response format, Ordering has to adapt — that's the customer/supplier dynamic.
+
+### Published Language
+
+For inter-context events (asynchronous communication), we defined a published language — a shared schema that both sides agree on:
+
+```typescript
+// shared/events/order-events.ts
+// This schema is versioned and owned by the Ordering context
+// Other contexts consume it but cannot change it
+
+interface OrderConfirmedEventV2 {
+  eventType: 'order.confirmed';
+  version: 2;
+  timestamp: string;
+  payload: {
+    orderId: string;
+    customerId: string;
+    lineItems: Array<{
+      sku: string;
+      quantity: number;
+      unitPrice: number;
+      currency: string;
+    }>;
+    shippingAddress: {
+      street: string;
+      city: string;
+      postalCode: string;
+      countryCode: string;
+    };
+    totalAmount: number;
+  };
+}
+```
+
+We stored event schemas in a shared repository and enforced backward compatibility through CI checks. Adding fields was fine; removing or renaming fields required a new version.
+
+### Shared Kernel
+
+Between Inventory and Shipping, we had a shared kernel for physical item properties — `Weight`, `Dimensions`, and `SKU` value objects. Both contexts needed identical representations:
+
+```typescript
+// shared-kernel/value-objects.ts
+class Weight {
+  private constructor(
+    readonly value: number,
+    readonly unit: 'kg' | 'lb',
+  ) {
+    if (value < 0) throw new Error('Weight cannot be negative');
+  }
+
+  static kg(value: number): Weight {
+    return new Weight(value, 'kg');
+  }
+
+  static lb(value: number): Weight {
+    return new Weight(value, 'lb');
+  }
+
+  toKg(): number {
+    return this.unit === 'kg' ? this.value : this.value * 0.453592;
+  }
+
+  equals(other: Weight): boolean {
+    return Math.abs(this.toKg() - other.toKg()) < 0.001;
+  }
+}
+
+class Money {
+  private constructor(
+    readonly value: number,
+    readonly currency: string,
+  ) {
+    if (value < 0) throw new Error('Money cannot be negative');
+  }
+
+  static of(value: number, currency: string): Money {
+    return new Money(value, currency);
+  }
+
+  add(other: Money): Money {
+    if (this.currency !== other.currency) {
+      throw new Error(`Cannot add ${this.currency} and ${other.currency}`);
+    }
+    return new Money(this.value + other.value, this.currency);
+  }
+
+  multiply(factor: number): Money {
+    return new Money(this.value * factor, this.currency);
+  }
+
+  equals(other: Money): boolean {
+    return this.currency === other.currency && this.value === other.value;
+  }
+}
+```
+
+A word of caution on shared kernels: they couple the contexts that share them. We kept ours minimal — only immutable value objects that both teams genuinely needed to be identical. The moment someone wanted to add a method that only one context needed, we said no. That's a sign the concept should live in one context and be translated by the other.
+
+## Ubiquitous Language in Practice
+
+Getting the language right was harder than getting the code right. Here's a real example of how language misalignment caused a production incident.
+
+### The "Cancellation" Incident
+
+When a customer cancelled an order, the system fired a `OrderCancelled` event. The Inventory context released the reserved stock. The Payment context issued a refund. Everything worked fine — until it didn't.
+
+A customer service rep "cancelled" an order that had already shipped. In the CS tool, "cancel" meant "initiate a return process." In the Ordering context, "cancel" meant "void the order as if it never happened." The result: stock was released (duplicated inventory), a refund was issued (money lost), but the package was already in transit.
+
+The fix wasn't code — it was language. We established clear definitions:
+
+- **Cancel**: Void an order that has NOT been shipped. Releases inventory, refunds payment.
+- **Return**: Initiate a return for an order that HAS been shipped. Creates a return merchandise authorization (RMA), doesn't release stock until physical items are received.
+
+```typescript
+// ordering/domain/order.ts
+class Order {
+  cancel(reason: CancellationReason): void {
+    if (this.status === 'shipped' || this.status === 'delivered') {
+      throw new OrderCannotBeCancelledError(
+        `Order ${this.id} has status '${this.status}'. Use initiateReturn() instead.`,
+      );
+    }
+
+    if (this.status === 'cancelled') {
+      return; // idempotent
+    }
+
+    this.status = 'cancelled';
+    this.cancellationReason = reason;
+    this.cancelledAt = new Date();
+
+    this.addDomainEvent(
+      new OrderCancelledEvent(this.id, reason, this.lineItems),
+    );
+  }
+
+  initiateReturn(items: ReturnItem[], reason: ReturnReason): Return {
+    if (this.status !== 'shipped' && this.status !== 'delivered') {
+      throw new ReturnNotAllowedError(
+        `Order ${this.id} has not been shipped yet. Use cancel() instead.`,
+      );
+    }
+
+    const returnRequest = Return.create({
+      orderId: this.id,
+      items,
+      reason,
+    });
+
+    this.addDomainEvent(
+      new ReturnInitiatedEvent(this.id, returnRequest.id, items),
+    );
+
+    return returnRequest;
+  }
+}
+```
+
+This distinction was added to our domain glossary and enforced in code. The method names reflect the ubiquitous language. No developer can accidentally call `cancel()` on a shipped order because the domain model won't allow it.
+
+### Maintaining the Glossary
+
+We kept a living glossary in our wiki with these fields:
+
+| Term | Context | Definition | Not to be confused with |
+|------|---------|------------|------------------------|
+| Cancel | Ordering | Void an unshipped order | Return (post-shipment) |
+| Return | Ordering | Post-shipment return process | Cancel (pre-shipment) |
+| Reservation | Inventory | Temporary stock hold (30min TTL) | Allocation (permanent) |
+| Allocation | Inventory | Permanent stock assignment to order | Reservation (temporary) |
+| Promotion | Pricing | A price rule with conditions and discounts | Campaign (Marketing) |
+| Campaign | Marketing | A collection of promotions with targeting rules | Promotion (Pricing) |
+
+Every PR that introduced a new domain term required a glossary update. We enforced this socially (code review), not technically, and it worked well enough.
+
+## Production Gotchas
+
+### The Boundary That Was Too Fine-Grained
+
+In our initial design, we split Pricing into two contexts: "Base Pricing" and "Promotional Pricing." It seemed logical — base prices rarely changed, promotions changed daily. In practice, calculating an effective price always required calling both services, adding 15ms latency to every product page. Price calculations that took 1ms in the monolith now took 30ms with two network hops.
+
+We merged them back into a single Pricing context within 3 months. The lesson: **don't split contexts that are always queried together.** Rate of change is a useful heuristic, but it's not the only one. Access patterns matter just as much.
+
+### Cross-Context Reporting
+
+Our product manager wanted a dashboard showing "revenue by category with promotion effectiveness." This query spanned Ordering (revenue), Catalog (categories), and Pricing (promotions) — three bounded contexts. No single service had all the data.
+
+We solved it with a dedicated reporting read model that consumed events from all three contexts and built a denormalized view:
+
+```typescript
+// reporting/projections/revenue-by-category.ts
+class RevenueByCategoryProjection {
+  async handleOrderConfirmed(event: OrderConfirmedEvent): Promise<void> {
+    for (const item of event.payload.lineItems) {
+      await this.repository.upsert({
+        date: event.timestamp,
+        sku: item.sku,
+        revenue: item.unitPrice * item.quantity,
+        currency: item.currency,
+        orderId: event.payload.orderId,
+      });
+    }
+  }
+
+  async handleProductCategorized(event: ProductCategorizedEvent): Promise<void> {
+    await this.repository.updateCategory({
+      sku: event.payload.sku,
+      categoryId: event.payload.categoryId,
+      categoryPath: event.payload.categoryPath,
+    });
+  }
+
+  async handlePromotionApplied(event: PromotionAppliedEvent): Promise<void> {
+    await this.repository.updatePromotion({
+      orderId: event.payload.orderId,
+      sku: event.payload.sku,
+      promotionId: event.payload.promotionId,
+      discountAmount: event.payload.discountAmount,
+    });
+  }
+}
+```
+
+This is a common pattern: bounded contexts keep their boundaries clean for writes, but reporting often needs a cross-context read model. Accept it and design for it instead of fighting it.
+
+### Ubiquitous Language Drift
+
+Six months in, we noticed that the development team had started using shorthand that diverged from the glossary. "Promo" instead of "Promotion", "alloc" instead of "Allocation." Seems harmless, but a new developer read the code, saw `allocateItems()`, and assumed it meant "reserve" — not "permanently assign." The result was a bug where reserved-but-not-paid items were treated as sold.
+
+Now we lint for it. Variable names, method names, and event names must use the full glossary term. `promoId` is rejected in code review; `promotionId` is required.
+
+## Key Takeaways
+
+- **EventStorming before code.** Don't guess your boundaries — discover them with the people who understand the domain. Two days of sticky notes saved us months of wrong abstractions.
+- **One concept, one context.** If "Product" means different things to different teams, it should be different types in different bounded contexts. Don't force a shared model.
+- **Start coarse, split later.** It's much easier to split a context that's grown too large than to merge two contexts that were split too early. We merged Pricing back together; splitting it had been premature.
+- **Language is the hardest part.** Getting developers and domain experts to agree on terms and then consistently use them in code, conversation, and documentation requires constant effort. But it prevents the costliest bugs — the ones that come from misunderstanding, not from typos.
+- **Context maps are living documents.** Revisit them quarterly. Teams change, requirements change, and the integration patterns that made sense 6 months ago might need adjustment.
+
+---
+
+Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
