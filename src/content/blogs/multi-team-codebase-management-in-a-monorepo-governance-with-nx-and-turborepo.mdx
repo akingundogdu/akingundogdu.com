@@ -1,0 +1,112 @@
+---
+title: "Multi-Team Codebase Management in a Monorepo: Governance with Nx and Turborepo"
+description: "Navigate the complex world of managing a large frontend monorepo shared by multiple teams using Nx and Turborepo, focusing on code ownership, dependency management, CI optimization, and governance strategies."
+datetime: "2025-10-18"
+image: ""
+---
+
+I remember the time when my team and I were drowning in a sea of repositories. Each new feature or bug fix required us to jump between multiple codebases, and keeping dependencies in sync was a never-ending task. Frustration levels were high as our CI pipeline slowed to a crawl, eventually leading us to the lightbulb moment: we needed to consolidate everything into a monorepo. Managing multiple teams in a gigantic frontend codebase isn't for the faint-hearted, but tools like Nx and Turborepo can take a lot of the sting out of the process. In this piece, I'll walk you through how we navigated this transformation, encountered pitfalls, and found solutions.
+
+## Understanding Nx and Turborepo
+
+Choosing between Nx and Turborepo is akin to picking between two highly talented technicians with slightly different specialties. Both can manage our requirement of a multi-team monorepo effectively, but their differences influence their suitability based on specific needs.
+
+### Nx Architecture and Mechanics
+
+Nx is more than just a task runner; it's an opinionated framework suited to help with Lerna-esque monorepo management and beyond. It provides an intricate plugin system that allows for rich, integrated tooling within the monorepo ecosystem.
+
+Nx uses the affected graph, which lets you run a task only on the projects affected by changes. As an example:
+
+```bash
+nx affected:test
+```
+
+This command ensures you only run tests in projects that have been altered or impacted by your current branch changes.
+
+### Turborepo Task Orchestration
+
+On the other hand, Turborepo focuses heavily on performance with its zero-config task interleaving, and it does wonders with its caching philosophy. Turborepo automatically re-uses the build results from previous runs where applicable, seeing such effects take build times from over an hour down to mere minutes.
+
+```json
+// turbo.json
+{
+  "pipeline": {
+    "lint": {},
+    "build": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    }
+  }
+}
+```
+
+Creating a pipeline like this allows Turborepo to know exactly which tasks depend on which outcomes, making it an efficient CI ally.
+
+## Governance with Code Ownership
+
+In a large monorepo shared by multiple teams, governance is critical. Enforcing code ownership is essential to ensure smooth collaboration. Here's how CODEOWNERS files can be structured:
+
+```plaintext
+# CODEOWNERS
+/frontend/team-a/ @frontend-team-a
+/frontend/team-b/ @frontend-team-b
+```
+
+By defining which team is responsible for what, we encountered fewer review bottlenecks and more accountability. However, one early mistake was insufficiently granular ownership definitions, which led to cross-team code bloat. We had to split directories further to enforce more focused boundaries.
+
+## Running Affected Commands and Dependency Graph Analysis
+
+The ability to execute affected commands is essential for streamlining development and CI pipelines. Nx's dependency graph visualization helped us better understand inter-package dependencies, enforcing module boundaries that once seemed porous.
+
+```bash
+nx affected:dep-graph
+```
+
+Visualizing these relationships brought to light unexpected dependencies and helped enforce clearer boundaries.
+
+## Optimizing CI with Task Execution and Caching
+
+CI pipelines traditionally slow down significantly in a monorepo setup. Both Nx and Turborepo offer remote caching capabilities to help mitigate these issues.
+
+In Turborepo, enabling remote caching is straightforward:
+
+```json
+{
+  "cache": {
+    "remoteCache": {
+      "enabled": true,
+      "endpoint": "https://my-cache-service"
+    }
+  }
+}
+```
+
+This setup reduced our average CI time from 20 minutes to around 5, thanks to the effective re-use of cached results.
+
+A misstep to be aware of is cache invalidation issues. We experienced an incident where stale data was served due to a misconfiguration in cache keys, leading to a day of debugging erroneous UI behavior.
+
+## Workspace Conventions and Versioning Strategy
+
+Setting standards is fundamental in a multi-team setup. Naming conventions and shared configuration files like ESLint, TypeScript, and Prettier are essential to maintaining homogeneity.
+
+For versioning, we had to decide between independent and fixed versioning. After a long debate, we went with fixed versioning due to its simplicity in synchronizing releases and avoiding the cascading dependency updates that plagued our previous multi-repo strategy.
+
+## Migrating from Multi-Repo to Monorepo
+
+Moving from multiple repositories to a monorepo was our biggest challenge. Maintaining git history was critical, and tools like `git subtree` helped preserve this during our migration.
+
+The pitfall here was the unexpected increase in complexity when merging divergent histories, which initially created a tangled mess. It took a dedicated effort to rewrite portions of history to bring everything into alignment.
+
+## Lessons Learned
+
+Here are some key takeaways from our journey:
+
+- **Governance**: Clear code ownership with CODEOWNERS was crucial for cross-team collaboration.
+- **CI Efficiency**: Remote caching and understanding dependency graphs can drastically reduce build times and increase throughput.
+- **Error Handling**: Stay vigilant with cache invalidation to avoid incorrect data serving.
+- **Standardization**: Enforce workspace conventions to avoid chaos in a multi-team setup.
+- **Thoughtful Migration**: Preserve git history when transitioning to avoid losing vital information.
+
+Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
