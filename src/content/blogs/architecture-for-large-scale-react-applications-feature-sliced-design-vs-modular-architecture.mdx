@@ -1,0 +1,196 @@
+---
+title: "Architecture for Large-Scale React Applications: Feature-Sliced Design vs Modular Architecture"
+description: "Dive into organizing large React applications with Feature-Sliced Design and Modular Architecture, focusing on scalable patterns and real-world examples."
+datetime: "2025-02-19"
+image: ""
+---
+
+When my team first hit the 100K monthly active users mark on our e-commerce platform, we realized our React codebase was starting to resemble an overgrown jungle. With every feature added, navigating the code felt like wading through thick vines of interdependencies and spaghetti imports. It was time to rethink our architecture, and that led us to explore Feature-Sliced Design (FSD) and modular architectures. Here's how we adapted these concepts for scale.
+
+## Feature-Sliced Design (FSD)
+
+### Understanding Feature-Sliced Design
+
+FSD promotes organizing your codebase according to features rather than technical layers. This involves breaking down the app into slices, segments, and layers such as app, pages, widgets, features, entities, and shared. This approach aligns closely with business functionality, which makes scaling and understanding the codebase easier.
+
+### Implementing FSD: A Dashboard Application Example
+
+Imagine a dashboard app with 50+ features — analytics, user profiles, billing, etc., each feature is organized into its folder structure.
+
+```plaintext
+/src
+  /entities
+    /user
+      index.tsx
+      model.ts
+  /features
+    /userProfile
+      /ui
+        ProfileCard.tsx
+      /model
+        useProfile.ts
+  /widgets
+    /UserMenu
+      index.tsx
+  /pages
+    /Dashboard
+      index.tsx
+```
+
+In this structure:
+- **Entities** represent business domain objects.
+- **Features** hold isolated functional parts.
+- **Widgets** are larger UI components composed of multiple features.
+- **Pages** import all slices and render the application.
+
+### Code Example: A Profile Feature
+
+Here's a simple user profile feature illustrating FSD.
+
+```typescript
+// features/userProfile/ui/ProfileCard.tsx
+import React from 'react';
+import { useProfile } from '../model/useProfile';
+
+export const ProfileCard = () => {
+  const { data, error } = useProfile();
+
+  if (error) return <div>Error loading profile</div>;
+  if (!data) return <div>Loading...</div>;
+
+  return <div>{data.name}</div>;
+};
+
+// features/userProfile/model/useProfile.ts
+import { useState, useEffect } from 'react';
+import { fetchUserProfile } from '../../entities/user/api';
+
+export const useProfile = () => {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchUserProfile()
+      .then(response => setData(response))
+      .catch(setError);
+  }, []);
+
+  return { data, error };
+};
+```
+
+### Lessons from Implementing FSD
+
+The initial transition was painful. We underestimated the effort required to maintain clear boundaries between slices. Looking back, aligning the slices closely with our Agile stories worked better.
+
+## Modular Architecture
+
+### The Modular Approach
+
+Modular architecture also segments applications, but focuses on creating self-contained feature and shared modules. This reduces coupling and enhances reusability.
+
+### Folder Structure: Flat vs Nested
+
+A flat structure for smaller projects helps avoid deeply nested imports. However, in large projects, a nested structure aids organization and team navigation.
+
+```plaintext
+/src
+  /modules
+    /analytics
+      /components
+      /hooks
+      /helpers
+    /user
+      /components
+      /hooks
+      /helpers
+```
+
+### Dependency Management
+
+Tools like `eslint-plugin-boundaries` ensure modules don't improperly import from each other, maintaining clear separation of concerns.
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  rules: {
+    'boundaries/no-import-aux': 'error'
+  },
+};
+```
+
+### Code Example: Shared Module
+
+```typescript
+// modules/user/components/UserCard.tsx
+import React from 'react';
+import { useUser } from '../hooks/useUser';
+
+export const UserCard = () => {
+  const { userData } = useUser();
+
+  return userData ? <div>{userData.username}</div> : <div>Loading...</div>;
+};
+
+// modules/user/hooks/useUser.ts
+import { useState, useEffect } from 'react';
+
+export const useUser = () => {
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    // Simulate an API call
+    setTimeout(() => setUserData({ username: 'johndoe' }), 1000);
+  }, []);
+
+  return { userData };
+};
+```
+
+## Lazy Loading and Code Splitting
+
+To address performance, we employed lazy loading, especially at module and feature levels. React's `React.lazy` serves beautifully here.
+
+```typescript
+// App.tsx
+import React, { Suspense, lazy } from 'react';
+const UserPage = lazy(() => import('./pages/UserPage'));
+
+const App = () => (
+  <Suspense fallback={<div>Loading...</div>}>
+    <UserPage />
+  </Suspense>
+);
+```
+
+## The Gotcha: Migration Challenges
+
+Migrating from a tangled mess to an organized architecture wasn't straightforward. My team spent over three sprints on refactoring alone. Initial attempts at migration caused our CI pipeline to break due to uncaught circular dependencies and misconfigured imports.
+
+### Problem: Circular Dependencies
+
+By introducing `eslint-plugin-import`, we detected and fixed these issues early. This experience taught us the importance of maintaining clean import boundaries from the beginning, not just during refactoring.
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  rules: {
+    'import/no-cycle': 'error',
+  },
+};
+```
+
+### Problem: Performance Hit
+
+During migration, we encountered a performance dip. A poorly implemented lazy loading strategy can lead to unnecessary re-renders and code splitting that fragments too much. We solved it by balancing lazy boundaries and ensuring page-level lazy loading wherever possible.
+
+## Closing Thoughts and Takeaways
+
+Designing a scalable React application isn't merely about picking the latest architecture trend; it's about aligning your codebase structure with your team's workflow and project requirements. Here's what worked for us:
+
+- **Align architecture with business logic**: Organize your codebase in a way that reflects real-world business functionality.
+- **Maintain import boundaries**: Use tools to enforce clean separations.
+- **Leverage lazy loading wisely**: Optimize for both performance and developer efficiency.
+- **Iterative migration**: Migrate in phases to manage technical debt without halting feature development.
+
+These strategies helped us tame the beast our codebase had become. Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
