@@ -1,0 +1,173 @@
+---
+title: "Complex State Management: Undo/Redo, Collaboration, and Real-Time Sync in an App Builder Studio"
+description: "Explore managing complex state in builder/studio applications with undo/redo, collaborative editing, and real-time synchronization, leveraging patterns like CRDTs and Immer."
+datetime: "2024-04-22"
+image: ""
+---
+
+When we first embarked on building a web-based design studio—a tool akin to Figma or Notion—the challenges were clear. We aimed to support complex state management including undo/redo functionality, real-time collaboration, and seamless synchronization. This wasn't just about displaying data; it required a robust architecture to handle concurrent edits and live updates without stepping on each other's toes.
+
+## Command Pattern for Undo/Redo
+
+One of the first challenges was implementing an intuitive undo/redo system. We embraced the command pattern, a design choice that lets us encapsulate all changes as first-class actions, making them reversible.
+
+### Implementing the Command Pattern
+
+By representing changes as commands, we could not only apply them but also reverse them. Here's a simplified version of how we structured our commands in TypeScript:
+
+```typescript
+interface Command {
+  execute(): void;
+  undo(): void;
+}
+
+class MoveElementCommand implements Command {
+  constructor(private element: HTMLElement, private deltaX: number, private deltaY: number) {}
+
+  execute(): void {
+    this.element.style.left = `${parseInt(this.element.style.left, 10) + this.deltaX}px`;
+    this.element.style.top = `${parseInt(this.element.style.top, 10) + this.deltaY}px`;
+  }
+
+  undo(): void {
+    this.element.style.left = `${parseInt(this.element.style.left, 10) - this.deltaX}px`;
+    this.element.style.top = `${parseInt(this.element.style.top, 10) - this.deltaY}px`;
+  }
+}
+```
+
+The undo stack simply consists of command instances, which lets us reverse actions with precision while keeping the UI responsive.
+
+## Immer for Immutable State
+
+For maintaining an immutable state, we leveraged Immer. It allowed us to work with "draft" states, making our state updates more predictable and our undo/redo logic more straightforward, by producing state patches.
+
+### Using Immer with Patch Generation
+
+Immer’s patch generation was a game-changer. Here’s how it helped us manage state:
+
+```typescript
+import produce, { Draft } from 'immer';
+
+interface AppState {
+  elements: Record<string, HTMLElementProps>;
+}
+
+const initialState: AppState = { elements: {} };
+
+const reducer = (state = initialState, action): AppState => {
+  switch(action.type) {
+    case 'MOVE_ELEMENT':
+      return produce(state, (draft: Draft<AppState>) => {
+        draft.elements[action.payload.id].x += action.payload.deltaX;
+        draft.elements[action.payload.id].y += action.payload.deltaY;
+      });
+    default:
+      return state;
+  }
+};
+
+// Apply a reducer with undo capability using patches
+let [nextState, patches, inversePatches] = produce(
+  currentState,
+  draft => {
+    draft.elements[elementId].x += deltaX;
+    draft.elements[elementId].y += deltaY;
+  },
+  (patchesProduced, inverseProduced) => {
+    patches = patchesProduced;
+    inversePatches = inverseProduced;
+  }
+);
+```
+
+The use of Immer’s structural sharing made the application efficient by only updating necessary parts of the state tree.
+
+## CRDTs for Collaborative Editing
+
+When it came to collaborative editing, Conflict-free Replicated Data Types (CRDTs) proved invaluable. They allowed us to resolve conflicts automatically in many cases, reducing the complexity typically involved in synchronizing multiple users' real-time actions.
+
+### Practical Application of CRDTs
+
+CRDTs solve complex synchronization issues by ensuring consistency without needing a central server to mediate:
+
+```typescript
+class TextCRDT {
+  // Simple example of text-based CRDT operations
+  addChar(position: number, char: string) { /* Implementation */} 
+  removeChar(position: number) { /* Implementation */}
+  
+  // These methods ensure operations integrate seamlessly across different peers
+}
+```
+
+This setup prevented our team from dealing with merge conflicts manually, a huge win when the user base scaled to hundreds of concurrent users.
+
+## Real-Time Sync
+
+Our decision to use WebSockets for real-time synchronization was based on the need for low latency and efficient data transport. However, choosing between operational transforms (OT) and CRDTs was a tough call.
+
+### WebSocket-Based Sync with Real-Time Collaboration
+
+While CRDTs were effective, integrating WebSockets required managing connection states and ensuring messages were delivered promptly:
+
+```typescript
+// WebSocket initialization 
+const socket = new WebSocket('wss://example.com/collaborate');
+
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  // Handle incoming sync operations
+};
+
+socket.onopen = () => setReadyState(true);
+socket.onerror = (err) => console.error('WebSocket error', err);
+```
+
+A vital part of our implementation was the presence indicators, which enhanced the user's sense of active collaboration.
+
+## Performance with Large State Trees
+
+Performance became a challenge as the application grew. We utilized selective re-rendering and virtualization techniques to maintain speed even with large state trees.
+
+### Virtualizing Component Trees
+
+React's built-in `memo` and optimization techniques like lazy loading and virtualized lists were crucial:
+
+```typescript
+import React, { memo } from 'react';
+
+const ListItem = memo(({ item }) => {
+  // Render logic
+});
+
+const VirtualizedList = React.forwardRef(({ items }, ref) => {
+  // Virtualize the rendering of the list items
+  return (
+    <div ref={ref}>
+      {items.map(item => (
+        <ListItem key={item.id} item={item} />
+      ))}
+    </div>
+  );
+}, (prevProps, nextProps) => /* Compare props */);
+```
+
+By combining virtualization techniques with selective updates, we were able to reduce CPU use significantly when dealing with complex UI changes.
+
+## The Gotcha: Handle with Care
+
+Despite our careful planning, not everything went smoothly. One major issue was with WebSocket disconnections, which sometimes led to stale state during heavy network traffic. This was alleviated by implementing exponential backoff for reconnection attempts.
+
+I recall a particularly stressful week where a bug in our command pattern logic resulted in recursive loops during undo operations, causing substantial slowdown. The issue boiled down to improperly handled inverse operations for batch commands. Ensuring meticulous unit testing for each command type helped us resolve this. We learned the hard way the importance of integrating comprehensive tests early.
+
+## Closing Thoughts
+
+Some practical takeaways from our journey into complex state management:
+
+- **Efficiency is Key:** Always measure and optimize the rendering lifecycle.
+- **Robustness Requires Testing:** Write tests for state transitions and synchronizations.
+- **Decouple State and UI Logic:** Keep them separate to simplify reasoning and testing.
+- **Handle Disconnections Gracefully:** Design your application to expect the network to fail.
+
+Thanks for reading. If you found this exploration of state management insightful or have specific questions, feel free to reach out — I always enjoy discussing architecture and real-time collaboration strategies. See you in the next one.
