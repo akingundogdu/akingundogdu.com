@@ -1,0 +1,323 @@
+---
+title: "Micro-Frontend Architecture: Runtime Composition with Module Federation"
+description: "A practical guide to implementing micro-frontends using Webpack Module Federation, focusing on runtime composition, shared dependencies, and independent deployment."
+datetime: "2025-10-21"
+image: ""
+---
+
+When my team first embarked on building a large-scale e-commerce platform with multiple independent features, we quickly realized that the traditional monolithic frontend approach wouldn't cut it. Each team needed autonomy to innovate and deploy independently. That's when we turned to micro-frontends, particularly leveraging Webpack Module Federation for runtime composition.
+
+## Understanding Module Federation
+
+Webpack Module Federation is a game-changer when it comes to breaking down monolithic frontends into bite-sized, independently deployable applications. It allows you to load small "micro-apps" into a larger shell application at runtime.
+
+### Configuring Remotes and Hosts
+
+The first step is understanding how to configure the remote and host applications. Remotes are the micro-frontends themselves, while the host is typically a shell application that loads these micro-frontends.
+
+**Remote Configuration:**
+
+```javascript
+// webpack.config.js for a remote app
+module.exports = {
+  output: {
+    publicPath: "http://localhost:3001/",
+  },
+  plugins: [
+    new ModuleFederationPlugin({
+      name: "productApp",
+      filename: "remoteEntry.js",
+      exposes: {
+        './ProductComponent': './src/ProductComponent',
+      },
+      shared: { react: { singleton: true }, "react-dom": { singleton: true } },
+    }),
+  ],
+};
+```
+
+**Host Configuration:**
+
+```javascript
+// webpack.config.js for a host app
+module.exports = {
+  plugins: [
+    new ModuleFederationPlugin({
+      name: "mainApp",
+      remotes: {
+        productApp: "productApp@http://localhost:3001/remoteEntry.js",
+      },
+      shared: { react: { singleton: true }, "react-dom": { singleton: true } },
+    }),
+  ],
+};
+```
+
+The configuration is fairly straightforward but crucial. Ensuring that shared dependencies like React and ReactDOM are singletons prevents version mismatches.
+
+## Runtime Composition
+
+One of the joys and challenges of micro-frontends is the ability to load and update parts of your application on the fly.
+
+### Loading Remote Modules
+
+To load these modules at runtime, you need a mechanism in your host app to dynamically import components.
+
+```javascript
+// Dynamic import in host application
+import React, { Suspense } from 'react';
+
+const RemoteProductComponent = React.lazy(() =>
+  import('productApp/ProductComponent')
+);
+
+const App = () => (
+  <Suspense fallback="Loading...">
+    <RemoteProductComponent />
+  </Suspense>
+);
+
+export default App;
+```
+
+This lazy loading pattern allows the main application to seamlessly pull in remote modules.
+
+### Error Boundaries
+
+Don't forget error handling; integrating remote modules can fail due to network issues or mismatched interfaces.
+
+```javascript
+// Error boundary for handling failed module loading
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    // Log error to a service
+    console.error("Error loading remote component", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <h1>Something went wrong.</h1>;
+    }
+
+    return this.props.children; 
+  }
+}
+```
+
+Integrating error boundaries ensures that the entire app doesn't crash when a micro-frontend component fails.
+
+## Independent Deployment
+
+We've all been there — one small change requires redeploying the entire application. With micro-frontends, each feature team can deploy independently.
+
+### CI/CD Pipelines
+
+Each micro-frontend should have its CI/CD pipeline, allowing it to be tested and deployed without affecting others.
+
+```yaml
+# Sample GitHub Actions workflow for a micro-frontend
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+      - name: Install dependencies
+        run: npm install
+      - name: Run tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Deploy
+        run: npm run deploy
+```
+
+This autonomy minimizes deployment risks and accelerates feature release cycles.
+
+## Shared Dependencies
+
+Handling shared dependencies is crucial in avoiding duplication and potential version conflicts. Ensuring a single version across your micro-frontends can prevent subtle bugs.
+
+### Singleton Sharing
+
+When configuring your micro-frontend’s Module Federation, ensure dependencies like React are shared as singletons.
+
+```javascript
+shared: {
+  react: {
+    singleton: true,
+    requiredVersion: "^17.0.0",
+  },
+  "react-dom": {
+    singleton: true,
+    requiredVersion: "^17.0.0",
+  }
+}
+```
+
+If version mismatches occur, resolve them by aligning package versions across your remotes.
+
+## Routing Across Micro-Frontends
+
+Routing in a micro-frontend architecture needs careful planning to ensure seamless user navigation.
+
+### Shell Application Routing
+
+The shell can maintain global routes, while each micro-frontend handles its respective routes.
+
+```javascript
+// Example with React Router
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import React from 'react';
+
+function App() {
+  return (
+    <Router>
+      <Switch>
+        <Route path="/products" component={RemoteProductComponent} />
+        <Route path="/cart" component={RemoteCartComponent} />
+        // other routes...
+      </Switch>
+    </Router>
+  );
+}
+
+export default App;
+```
+
+For a uniform experience, use context and configuration sharing for routing logic, ensuring consistency across remotes.
+
+## Cross-App Communication
+
+Proper communication between micro-frontends is essential for maintaining application coherence.
+
+### Pub/Sub Patterns
+
+To facilitate interaction, implement a pub/sub or shared state mechanism, avoiding tight coupling between applications.
+
+```javascript
+// Simple Event Emitter
+class EventEmitter {
+  constructor() {
+    this.events = {};
+  }
+
+  on(event, listener) {
+    if (!this.events[event]) this.events[event] = [];
+    this.events[event].push(listener);
+  }
+
+  off(event, listenerToRemove) {
+    if (!this.events[event]) return;
+    this.events[event] = this.events[event].filter(listener => listener !== listenerToRemove);
+  }
+
+  emit(event, data) {
+    if (!this.events[event]) return;
+    this.events[event].forEach(listener => listener(data));
+  }
+}
+
+export const eventEmitter = new EventEmitter();
+```
+
+Implementing a custom event system allows flexible data flow without direct dependencies.
+
+## Styling Isolation
+
+CSS management can quickly become chaotic in a micro-frontend setup. Adopting isolated styling solutions minimizes cross-app CSS clashes.
+
+### CSS Modules
+
+CSS Modules keep styles scoped to individual components, preventing conflicts between micro-frontends.
+
+```css
+/* App.module.css */
+.button {
+  background-color: blue;
+}
+```
+
+```javascript
+// Example Component
+import React from 'react';
+import styles from './App.module.css';
+
+function Button() {
+  return <button className={styles.button}>Click me</button>;
+}
+
+export default Button;
+```
+
+For highly dynamic apps, consider using the Shadow DOM to encapsulate styles even further.
+
+## Testing Micro-Frontends
+
+Testing micro-frontends can be challenging, especially in integration, ensuring they work harmoniously when composed.
+
+### Unit and Integration Testing
+
+Isolate unit tests for each micro-frontend but ensure integration tests cover the complete, composed application.
+
+```javascript
+// Jest unit test for a remote component
+import React from 'react';
+import { render } from '@testing-library/react';
+import ProductComponent from './ProductComponent';
+
+test('renders product component', () => {
+  const { getByText } = render(<ProductComponent />);
+  expect(getByText(/Product/)).toBeInTheDocument();
+});
+```
+
+For end-to-end testing, consider Cypress or Playwright to verify cross-app functionality.
+
+## When Micro-Frontends Aren’t the Solution
+
+It's easy to be seduced by the promise of micro-frontends without acknowledging their complexity overhead. 
+
+### Team Size and Complexity
+
+For smaller teams or less complex apps, micro-frontends may introduce unnecessary complexity. Consider simpler alternatives like feature flags or lazy loading within a single app if they suffice.
+
+## The Gotchas
+
+Overestimating the benefits of micro-frontends can lead to pitfalls.
+
+- **Version Conflicts**: We once had mismatched React versions across remotes causing subtle bugs, reminding us to align dependencies.
+- **Deployment Overhead**: Setting up independent pipelines was initially a headache, but the autonomous deployments paid off in agility.
+- **Styling Clashes**: Before enforcing CSS Modules, global styles wreaked havoc, a lesson in encapsulation.
+
+## Closing Thoughts
+
+If you’re considering micro-frontends, evaluate team autonomy, deployment needs, and application complexity. They offer immense power but require careful planning and coordination.
+
+**Practical Takeaways:**
+
+- Use Module Federation for seamless runtime composition and dependency management.
+- Ensure deployment autonomy with isolated CI/CD setups.
+- Handle cross-app communication carefully to avoid coupling.
+- Opt for styling isolation techniques to prevent global CSS bleeding.
+- Evaluate the necessity and complexity cost of micro-frontends for your specific case.
+
+Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy discussing architecture and deployment strategies. See you in the next one.
