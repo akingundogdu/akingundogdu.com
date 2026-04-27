@@ -1,0 +1,213 @@
+---
+title: "Frontend Performance at Scale: Bundle Size, Code Splitting, and Runtime Optimization"
+description: "A systematic guide to optimizing frontend performance in large-scale applications, focusing on bundle analysis, code splitting, and runtime enhancements."
+datetime: "2025-01-21"
+image: ""
+---
+
+When we started building our e-commerce platform, the frontend was snappy, and users were thrilled. But as features piled on, the performance started buckling — a far cry from the lean app we initially launched. The homepage's bundle size ballooned to over 1.5MB, and First Input Delay was creeping upward. We knew we had to tackle performance head-on, and here's how we approached it.
+
+## Bundle Analysis
+
+Our first target was reducing the bundle size. We began using tools like Webpack Bundle Analyzer and Vite Visualizer. These visualizations were eye-opening. They showed us precisely where our bloat came from.
+
+### Identifying Heavy Dependencies
+
+One major offender was a date library we'd imported in full when we only needed a few functions. We replaced it with date-fns. Here's the before and after:
+
+```javascript
+// Before
+import moment from 'moment';
+
+console.log(moment().format('MMMM Do YYYY, h:mm:ss a'));
+
+// After
+import { format } from 'date-fns';
+
+console.log(format(new Date(), 'MMMM do yyyy, h:mm:ss a'));
+```
+
+Just this change cut 75KB from the bundle. But it wasn't just about removing dependencies — it was also about ensuring our tools did their job.
+
+### Tree Shaking Pitfalls
+
+Tree shaking sounded magical, yet it wasn't working perfectly. Why? We discovered "side effects" and barrel files were to blame. We frequently had imports like this:
+
+```javascript
+// utils/index.ts
+export * from './math';
+export * from './string';
+```
+
+Webpack didn't tree-shake these efficiently. A quick refactor to explicit imports showed immediate improvements:
+
+```javascript
+// Direct Import
+import { add, subtract } from './utils/math';
+```
+
+Verifying tree shaking became part of our pipeline, with scripts checking module sizes post-build.
+
+## Code Splitting Strategies
+
+Next came code splitting. Initially, all of our code was packed into a single bundle, wreaking havoc on load times.
+
+### Route-Based Splitting
+
+We began with route-based code splitting. With React and React Router, it was straightforward:
+
+```javascript
+import { lazy, Suspense } from 'react';
+const Dashboard = lazy(() => import('./Dashboard'));
+
+function App() {
+  return (
+    <Router>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Route path="/dashboard" component={Dashboard} />
+      </Suspense>
+    </Router>
+  );
+}
+```
+
+This significantly improved the initial load, but we had more granular routes within pages.
+
+### Component-Level Splitting
+
+Diving deeper, we split components within heavy pages, looking at usage patterns to decide what to split.
+
+### Dynamic Import Patterns
+
+Dynamic importing enabled us to load components only when needed, reducing upfront costs.
+
+```javascript
+const loadComponent = async () => {
+  const { MyComponent } = await import('./MyComponent');
+  return <MyComponent />;
+};
+```
+
+## Runtime Optimization
+
+With build-time optimizations in place, our next challenge was runtime performance.
+
+### React.memo and useMemo Audit
+
+Memoization seemed powerful but wasn't a universal fix. We used React's Profiler to audit where memoization truly helped. Here's an example where it proved beneficial:
+
+```javascript
+const ExpensiveComponent = React.memo(({ data }) => {
+  // Expensive calculation or rendering
+  return <div>{data}</div>;
+});
+```
+
+However, overuse led to excessive renders due to shallow comparisons — a constant learning process.
+
+### Virtualization
+
+To tackle large data sets, we employed virtualization using react-window. This drastically cut rendering times for large lists.
+
+```javascript
+import { FixedSizeList as List } from 'react-window';
+
+const Row = ({ index, style }) => (
+  <div style={style}>Row {index}</div>
+);
+
+<List
+  height={150}
+  itemCount={1000}
+  itemSize={35}
+  width={300}
+>
+  {Row}
+</List>
+```
+
+Using tools like windowed grids helped manage our real-time data dashboards, enhancing performance.
+
+## Image Optimization
+
+Images are notorious for bloating web applications. Switching to Next.js, we leveraged its `<Image />` component for lazy loading and responsive images:
+
+```javascript
+import Image from 'next/image';
+
+<Image
+  src="/me.png"
+  alt="Picture of me"
+  width={500}
+  height={500}
+  layout="responsive"
+/>
+```
+
+Switching formats to WebP or AVIF, coupled with lazy loading, sharply cut the download weight.
+
+## Monitoring Web Vitals
+
+Addressing performance issues without measurement is like sailing without a compass. We set up Web Vitals to track LCP, FID/INP, and CLS. For example, improving our LCP from 3s to 1.5s directly correlated with our new caching strategies and server configuration tweaks.
+
+```javascript
+// Example setup with a monitoring service
+window.addEventListener('load', () => {
+  const { getCLS, getFID, getLCP } = require('web-vitals');
+  getCLS(console.log);
+  getFID(console.log);
+  getLCP(console.log);
+});
+```
+
+## Performance Budgets
+
+A lesson learned was establishing performance budgets. We set bundle size limits in our CI pipelines:
+
+```yaml
+build:
+  stage: build
+  script:
+    - npm run build
+    - npm run analyze-bundle-size
+```
+
+Alerts for regressions ensured we didn't spiral again.
+
+## Server-Side Rendering Trade-offs
+
+Choosing between SSR, SSG, and ISR was a constant debate. For our needs, static generation worked wonders for cacheable pages, but we used SSR strategically for others, keeping hydration costs in mind.
+
+### SSR vs. SSG vs. ISR
+
+With SSR, we immediately alleviated server load during rush hours, but SSG helped us serve static content quickly. For dynamic, non-time-sensitive data, ISR struck the right balance.
+
+```javascript
+// Next.js example
+export async function getStaticProps() {
+  // Fetch data at build time
+}
+
+export async function getServerSideProps() {
+  // Fetch data on each request
+}
+```
+
+## The Gotcha / Lessons Learned
+
+1. **Moment of Clarity:** Initially underutilizing Webpack's tree shaking due to barrel files intensified our loading woes. Explicit imports made the difference — a lesson in learning by doing.
+
+2. **The Memoization Trap:** While React memoization looked appealing, profiling taught us restraint. Overusing it without profiling led to unexpected re-rendering due to prop changes.
+
+3. **Virtualization Edge Case:** During a Black Friday event, unhandled edge cases in our virtualized lists led to rendering issues when data increased suddenly — reminding us to stress test thoroughly.
+
+## Closing
+
+Performance isn't a one-off task but a continuous journey. Our approach was systematic, uncovering gains at every layer. As we scaled, the lessons we learned became integral, keeping performance in check across our sprawling application.
+
+- **Analyze and prune your bundles regularly.**
+- **Optimize runtime rendering with considered memoization.**
+- **Utilize Web Vitals to guide optimization efforts.**
+- **Set and enforce performance budgets to prevent regression.**
+
+Thanks for reading. If you found this insightful or would like to discuss further, reach out. I always enjoy talking architecture. See you in the next one.
