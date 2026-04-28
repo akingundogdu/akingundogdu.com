@@ -126,11 +126,38 @@
     ],
     "experiences": [
         {
+            "title": "Founding Engineer & CTO",
+            "sub_title": "Musicpal",
+            "years": "Dec 2025 - Present",
+            "duration": "5 months",
+            "country": "San Francisco, CA, USA",
+            "work_mode": "Remote",
+            "company_link": "https://www.pianopal.ai",
+            "technologies": [
+                { "name": "Swift", "icon": "simple-icons:swift", "link": "https://www.swift.org" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "AWS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com" },
+                { "name": "shadcn/ui", "icon": "simple-icons:shadcnui", "link": "https://ui.shadcn.com" },
+                { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss", "link": "https://tailwindcss.com" },
+                { "name": "TanStack Query", "icon": "simple-icons:reactquery", "link": "https://tanstack.com/query" }
+            ],
+            "bullets": [
+                "Founding vision & product strategy: Laying the groundwork for a transformative initiative in the music industry—starting with PianoPal, an AI-powered platform that enables children and adults to learn piano through real-time conversational coaching, making deep musical mastery accessible to anyone regardless of access to in-person instruction.",
+                "AI coaching & real-time interaction: Architecting and building the core AI tutor experience—live, real-time conversational sessions where students interact with an AI coach that guides them through technique, theory, and musical nuance, replicating the depth and responsiveness of a private instructor.",
+                "Teacher dashboard & student analytics: Designed and shipped a comprehensive analytics dashboard for teachers—enabling them to manage the full lifecycle of student progress, create custom arrangements, assign personalized lessons and homework, and track performance across every dimension of practice.",
+                "AI-powered practice analysis & scoring: Built an intelligent practice review system that lets teachers replay student sessions, while AI analyzes errors, identifies weak areas, and produces detailed scoring and diagnostic reports—surfacing targeted suggestions so teachers can focus instruction on exactly where each student needs improvement.",
+                "Native piano apps & full-stack architecture: Developing the piano learning application natively in Swift and Android for optimal instrument interaction fidelity, with a Next.js, shadcn/ui, Tailwind CSS, and TanStack-powered web dashboard for teachers, backed by a Nest.js and PostgreSQL API layer on AWS infrastructure."
+            ]
+        },
+        {
             "title": "Senior Full Stack Software Engineer",
             "sub_title": "Kajabi",
             "years": "Mar 2023 - Jan 2026",
-            "duration": "2 years 10 months",
-            "country": "San Francisco, USA",
+            "duration": "2 years 11 months",
+            "country": "Irvine, California, USA",
             "work_mode": "Remote",
             "company_link": "https://kajabi.com",
             "company_icon": "Kajabi",
@@ -162,10 +189,56 @@
             ]
         },
         {
-            "title": "Lead Full Stack Software Engineer",
+            "title": "Founding Engineer & CTO",
+            "sub_title": "Movve",
+            "years": "Aug 2025 - Present",
+            "duration": "9 months",
+            "country": "Turkey",
+            "work_mode": "Remote",
+            "company_link": "https://www.movve.app",
+            "technologies": [
+                { "name": "React Native", "icon": "simple-icons:react", "link": "https://reactnative.dev" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "AWS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com" },
+                { "name": "shadcn/ui", "icon": "simple-icons:shadcnui", "link": "https://ui.shadcn.com" },
+                { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss", "link": "https://tailwindcss.com" },
+                { "name": "TanStack Query", "icon": "simple-icons:reactquery", "link": "https://tanstack.com/query" }
+            ],
+            "bullets": [
+                "Health & wearable platform: Building Movve as a direct competitor to Whoop—a health-tracking platform paired with the Movve Band that collects and analyzes detailed biometric data including sleep quality, heart rate, stress levels, and body temperature, making premium health insights accessible at a fraction of the cost.",
+                "AI health coaching & analytics: Architecting an AI coach that synthesizes raw biometric streams into actionable, statistically grounded insights—motivating users to move more, sleep better, and manage stress through personalized recommendations backed by their own data trends.",
+                "Mobile & cross-platform delivery: Developing the consumer-facing mobile experience in React Native for iOS and Android, with a Next.js, shadcn/ui, Tailwind CSS, and TanStack-powered web dashboard, all backed by a Nest.js and PostgreSQL API layer running on AWS."
+            ]
+        },
+        {
+            "title": "Founding Engineer & CTO",
+            "sub_title": "DigitalWisers",
+            "years": "Jan 2023 - Present",
+            "duration": "3 years 4 months",
+            "country": "Turkey",
+            "work_mode": "Remote",
+            "company_link": "https://digitalwisers.com/en",
+            "technologies": [
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "AWS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com" }
+            ],
+            "bullets": [
+                "Community platform: Built DigitalWisers as a community-driven platform competing in the Circle space—enabling creators and organizations to launch their own communities, manage audiences, and cultivate engaged member pools within a single, purpose-built product.",
+                "Talent marketplace & hiring pipeline: Designed and shipped an integrated hiring system that connects job-seeking candidates with engineering-hungry companies inside the same community ecosystem—managing the full recruitment lifecycle from discovery through placement so hiring happens where professional relationships already live.",
+                "End-to-end ownership: Owned the technical vision and architecture from inception—combining community management, audience engagement, and hiring workflows into a cohesive platform that serves both community operators and the talent marketplace simultaneously."
+            ]
+        },
+        {
+            "title": "Lead Full Stack Software Engineer & Engineering Manager",
             "sub_title": "Superpeer, Inc.",
             "years": "Dec 2020 - Mar 2023",
-            "duration": "2 years 3 months",
+            "duration": "2 years 4 months",
             "country": "San Francisco, USA",
             "work_mode": "Remote",
             "company_link": "https://superpeer.com",
@@ -191,7 +264,32 @@
             ]
         },
         {
-            "title": "Lead Full Stack Software Engineer",
+            "title": "Founding Engineer & CTO",
+            "sub_title": "Smarthronline",
+            "years": "Feb 2021 - Aug 2024",
+            "duration": "3 years 7 months",
+            "country": "Turkey",
+            "work_mode": "Remote",
+            "company_link": "https://www.smarthronline.net",
+            "technologies": [
+                { "name": "Next.js", "icon": "simple-icons:nextdotjs", "link": "https://nextjs.org" },
+                { "name": "Nest.js", "icon": "simple-icons:nestjs", "link": "https://nestjs.com" },
+                { "name": "TypeScript", "icon": "simple-icons:typescript", "link": "https://www.typescriptlang.org" },
+                { "name": "PostgreSQL", "icon": "simple-icons:postgresql", "link": "https://www.postgresql.org" },
+                { "name": "AWS", "icon": "simple-icons:amazonwebservices", "link": "https://aws.amazon.com" },
+                { "name": "shadcn/ui", "icon": "simple-icons:shadcnui", "link": "https://ui.shadcn.com" },
+                { "name": "Tailwind CSS", "icon": "simple-icons:tailwindcss", "link": "https://tailwindcss.com" },
+                { "name": "TanStack Query", "icon": "simple-icons:reactquery", "link": "https://tanstack.com/query" }
+            ],
+            "bullets": [
+                "Logistics HR platform: Built SmartHROnline as a purpose-built hiring and human resources platform for the logistics sector—where recruitment complexity is exceptionally high—digitizing the entire hiring lifecycle so companies can manage candidate pipelines, interviews, and onboarding online instead of through fragmented manual processes.",
+                "Referral-driven recruitment: Designed and shipped a referral-based staffing engine that sources and surfaces candidates to logistics companies through trusted professional networks—reducing time-to-hire and improving placement quality in an industry where reliability and speed are critical.",
+                "Communication & process management: Built integrated messaging and interview scheduling workflows between companies and candidates—centralizing correspondence, interview coordination, and hiring decisions in one platform so nothing falls through the cracks during fast-moving logistics recruitment cycles.",
+                "Full-stack architecture & delivery: Owned the end-to-end technical stack—Next.js with shadcn/ui, Tailwind CSS, and TanStack on the frontend, Nest.js and PostgreSQL on the backend, all running on AWS—shipping a production-grade platform from zero to serving active logistics companies."
+            ]
+        },
+        {
+            "title": "Founding Engineer & Lead Full Stack Software Engineer",
             "sub_title": "Epigra",
             "years": "Jan 2020 - Dec 2020",
             "duration": "1 year",
@@ -219,12 +317,12 @@
             ]
         },
         {
-            "title": "Senior Full Stack Software Engineer",
+            "title": "Senior Full Stack Software Engineer & CTO",
             "sub_title": "My Next Match",
             "years": "Aug 2016 - Oct 2019",
-            "duration": "3 years 2 months",
+            "duration": "3 years 3 months",
             "country": "London, UK",
-            "work_mode": "Remote",
+            "work_mode": "On-site",
             "company_link": "https://landing.mynextmatch.com/",
             "company_logo_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAt1BMVEX/////+vzqlqbbMVjUADbUAjb97/PcOl7SACjTADLrm6rVADTQDTrOWmvLSl/KEjzKACrRACy+mqLDyMi5cX7DADK8pam+V2rW2trT09PGTGK8i5XJyMrBLky8Sl/c3t7l5eXCP1fRACLIkpzp6enGs7jDJUbv7+/39/f5+fn8/Py5anjFg5D31d3icYPIur7RAB334ebmhZnPkJraV3Drp7XvwMnSNlDQeonWJ0zby8/ZTmjcRGL9zHGFAAABTUlEQVR4Ab2TBXIDMQxFnaw2K4eZEztoaJjp/ueq7DJz/9Cb0TNbjMXiAUD4SgCCeIyxRISc6q8aHKMEi2P4TjDJAv6ewAMG4XsBYOH7+VAIf1Xg9/eRInwhpNKZLIcbzGWyeXgmpArFUqmMHivVUqlWgCcCFMr1RqPRLFAdW0TtDn8iFLp1IaVo9/qYH9TlUIpROvVI4OO2VForUR8V23WHQzFAuBdSlZFUxlpn1AUhs3pYv8I7AXAihppRtBoOlTZEVsnGmHvBb4Dq0xl9D2O0sQ6dMa+kvJDKNaSyCcTFjPksARcrZpQYcHACrqluNwWiravHIsL+jtE29twJhQPtKt73t7UkYea2z49Lpk+5FAmUrU7ym+uIdstVHzyel0s3qxdwcfcxef8BFws36j8+DHz0aQE++PbR+40TsSS+J7i7vbzXvBf2YftfAxjMKa7glB4mAAAAAElFTkSuQmCC",
             "technologies": [
@@ -248,7 +346,7 @@
             "title": "Full Stack Software Engineer",
             "sub_title": "Siskon (JTI)",
             "years": "Mar 2014 - Jun 2016",
-            "duration": "2 years 3 months",
+            "duration": "2 years 4 months",
             "country": "Turkey",
             "work_mode": "On-site",
             "company_link": "https://www.jti.com",
@@ -271,7 +369,7 @@
         {
             "title": "Software Engineer",
             "sub_title": "Narkonteks Tekstil A.Ş. (Blackspade)",
-            "years": "Feb 2012 - Apr 2014",
+            "years": "Feb 2012 - Mar 2014",
             "duration": "2 years 2 months",
             "country": "Turkey",
             "work_mode": "On-site",
