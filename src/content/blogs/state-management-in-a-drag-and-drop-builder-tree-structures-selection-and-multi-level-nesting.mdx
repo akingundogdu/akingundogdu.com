@@ -1,0 +1,212 @@
+---
+title: "State Management in a Drag-and-Drop Builder: Tree Structures, Selection, and Multi-Level Nesting"
+description: "Explore the state management challenges in drag-and-drop interfaces, focusing on tree structures, selection models, and performance optimization for complex layouts."
+datetime: "2024-11-06"
+image: ""
+---
+
+Building a drag-and-drop builder to handle complex nested layouts feels like navigating through a maze. When my team embarked on developing a visual editor for an e-commerce CMS, we encountered unique state management challenges daily. Dealing with deeply nested component trees and a feature-rich selection model demanded more than just surface-level solutions.
+
+## Tree Structure State: Normalized Vs. Nested
+
+Imagine this: you're handling a dynamically nested layout where each component can be moved around, and you have to keep track of parent-child relationships efficiently. Here's where the decision between normalized and nested state becomes crucial.
+
+### Normalized State with Zustand
+
+I opted for Zustand because of its simplicity and performance. Using a flat structure with entity maps:
+
+```typescript
+import create from 'zustand';
+
+interface Node {
+  id: string;
+  parentId: string | null;
+  children: string[];
+}
+
+interface State {
+  nodes: Record<string, Node>;
+  getNode: (id: string) => Node | undefined;
+  setNode: (node: Node) => void;
+}
+
+const useStore = create<State>((set) => ({
+  nodes: {},
+
+  getNode: (id) => set(state => state.nodes[id]),
+
+  setNode: (node) => set(state => ({
+    nodes: { ...state.nodes, [node.id]: node }
+  }))
+}));
+
+// Adding node
+useStore.getState().setNode({ id: 'node1', parentId:'root', children: [] });
+```
+
+**The advantage?** Quick lookup by ID and easy updates, which makes operations like reparenting straightforward. However, you need to derive the actual tree structure from this flat state every render — a trade-off worth considering for large datasets.
+
+### Tree Derivation
+
+By deriving trees from a flat state, you can optimize further:
+
+```typescript
+function deriveTree(rootId: string): Node {
+  const store = useStore.getState();
+  const rootNode = store.getNode(rootId);
+
+  if (!rootNode) return { id: '', parent: '', children: [] };
+
+  const queue: Node[] = [rootNode];
+  const result: Node[] = [];
+
+  while (queue.length) {
+    const node = queue.pop();
+    if (!node) continue;
+
+    node.children.forEach((childId) => {
+      const childNode = store.getNode(childId);
+      if (childNode) queue.push(childNode);
+    });
+
+    result.push(node);
+  }
+
+  return result;
+}
+```
+
+It's like building a snapshot without persistently storing an expansive object in state. It works for our use case, as users typically interact with a limited view of the overall dataset.
+
+## Recursive Components: Rendering and Memoization
+
+Rendered tree structures can get unwieldy fast, especially when state changes cascade. Here's where React.memo and key management helped us mitigate unnecessary renders:
+
+```typescript
+const TreeNode = React.memo(({ nodeId }: { nodeId: string }) => {
+  const node = useStore((state) => state.getNode(nodeId));
+  return (
+    <div key={node?.id}>
+      {
+        node?.children.map((childId) => (
+          <TreeNode key={childId} nodeId={childId} />
+        ))
+      }
+    </div>
+  );
+});
+```
+
+Honestly, leveraging React.memo can feel like magic in reducing workload on React's reconciliation process. However, we learned this the hard way: stability in nodes' keys is paramount.
+
+## Selection Model: Single, Multi, Range
+
+Our selection model was wild, supporting single, multi, and range selection across nesting levels. Zustand worked beautifully, as it allowed dynamic injection of selection logic.
+
+### Multi-Select Implementation
+
+```typescript
+const useSelectionStore = create((set) => ({
+  selectedIds: new Set<string>(),
+
+  toggleSelect: (id: string) =>
+    set((state) => {
+      if (state.selectedIds.has(id)) {
+        state.selectedIds.delete(id);
+      } else {
+        state.selectedIds.add(id);
+      }
+    }),
+
+  rangeSelect: (startId: string, endId: string) =>
+    set((state) => {
+      // Implement range selection logic here
+    }),
+}));
+
+useSelectionStore.getState().toggleSelect('node1');
+```
+
+### A War Story: Inconsistent Selection
+
+One weekend, after deploying an update, our selections weren't respecting tree boundaries, bleeding into sibling containers. Turns out, we were ignoring node depth while deriving ranges. Lesson learned: always account for context in hierarchy-based selections.
+
+## Drag-and-Drop Mechanics: Seamless User Experience
+
+Using `dnd-kit`, we resolved complex drop zone calculations:
+
+```typescript
+import { useDroppable } from '@dnd-kit/core';
+
+function DraggableItem({ id }: { id: string }) {
+  const { isOver, setNodeRef } = useDroppable({
+    id,
+  });
+
+  return (
+    <div ref={setNodeRef} style={{ backgroundColor: isOver ? 'lightblue' : 'white' }}>
+      Drag Me
+    </div>
+  );
+}
+```
+
+Correcting a bug here involved accurately reflecting the real-time status (`isOver`) of each component, ensuring drop zones correctly visualized interactive states.
+
+### Gotcha: Complex Reordering
+
+Initially, our drops lead to catastrophic reorder logic. The items didn’t respect sibling relationships — a quick deep dive revealed that order calculations weren't accounting for transformed node lengths after dropping. We refined the logic to update sibling indices dynamically.
+
+## Undo/Redo for Tree Operations
+
+Maintaining state history for seamless undo/redo was crucial:
+
+```typescript
+const useHistoryStore = create((set) => ({
+  past: [],
+  present: null,
+  future: [],
+
+  undo: () => set((state) => {
+    if (state.past.length === 0) return;
+    const previous = state.past[state.past.length - 1];
+    set({ present: previous, past: state.past.slice(0, -1), future: [state.present, ...state.future] });
+  }),
+
+  redo: () => set((state) => {
+    if (state.future.length === 0) return;
+    const next = state.future[0];
+    set({ present: next, past: [...state.past, state.present], future: state.future.slice(1) });
+  })
+}));
+```
+
+We kept it simple, relying on Zustand's `set` method to manage state transitions while tracking past/present/future pointers.
+
+## Performance Optimization
+
+Achieving performance milestones was imperative. With deep prop chains in our tree, selective updates were a must. React's built-in optimizations with `useCallback` and `useMemo` were our allies:
+
+```typescript
+const memoizedCallback = useCallback(() => {
+  console.log('Expensive compute');
+}, [dependency]);
+
+useEffect(() => {
+  memoizedCallback();
+}, [memoizedCallback]);
+```
+
+Moreover, debouncing tree mutations involved delaying persistence actions, so the UI never buckled under pressure.
+
+## Closing Thoughts and Key Takeaways
+
+If you're venturing into drag-and-drop interfaces, here’s what I’ve learned:
+
+- **Normalized state**: Opt for flexibility and efficient updates.
+- **React.memo**: Essential for managing render costs in deep trees.
+- **Selection logic**: Tailor your selection model to respect tree structures.
+- **Drag mechanics**: Ensure your components reflect accurate interactivity.
+- **Undo/redo**: Not a luxury, but a necessity.
+
+Every step of the way taught us something new, right from selection anomalies to architecture halts weeks later due to minute logic gaps. Thanks for reading. If anything resonates or you’d like to chat more, feel free to reach out — I'm all ears for architecture debates. See you in the next one.
