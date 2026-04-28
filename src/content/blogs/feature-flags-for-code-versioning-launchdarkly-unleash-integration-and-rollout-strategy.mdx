@@ -1,197 +1,180 @@
 ---
 title: "Feature Flags for Code Versioning: LaunchDarkly/Unleash Integration and Rollout Strategy"
-description: "A hands-on guide to implementing feature flags in frontend applications, covering flag management, rollout strategies, A/B testing integration, and technical debt management."
+description: "How I've used feature flags with LaunchDarkly and Unleash in production — the good parts, the annoying parts, and the things I wish I'd known earlier."
 datetime: "2024-12-24"
 image: ""
 ---
 
-When our team decided to roll out a complex new feature across our e-commerce platform, feature flags became our best friend. We needed to manage risks in live environments while ensuring nothing disrupted our 200K daily users. We evaluated LaunchDarkly and Unleash to find the perfect fit for our nuanced needs.
+I've shipped features behind flags on three different projects now, across two different platforms (LaunchDarkly and Unleash), and my feelings about feature flags are… complicated. They're genuinely useful, but they also introduce a kind of complexity that sneaks up on you if you're not careful. Here's what I've learned from actually using them in production.
 
-## Understanding Feature Flag Platforms
+## LaunchDarkly vs Unleash — which one and why
 
-Choosing the right platform can make or break your strategy. With LaunchDarkly, you get a robust, feature-rich solution with fantastic support. On the other hand, Unleash is open-source, highly configurable, and self-hostable. Here's why we ended up using LaunchDarkly for this project:
+I've used both. On a previous project we ran Unleash because the team wanted to self-host everything. On a more recent e-commerce project we went with LaunchDarkly. They solve the same core problem but the experience is pretty different.
 
-### LaunchDarkly vs. Unleash
+**LaunchDarkly** is polished. The dashboard is good, the SDK docs are solid, targeting rules are powerful out of the box, and you get things like experimentation and audit logs without bolting on extra tooling. The downside is cost — it gets expensive fast, especially once you have a decent number of monthly active users. We hit a billing surprise about four months in when our MAU count crossed a tier boundary. Nobody had been watching that number.
 
-**LaunchDarkly**
+**Unleash** is more bare-bones but you own the infrastructure. The open-source version covers basic toggles and gradual rollouts well enough. Where it falls short is advanced targeting — if you need to target by user attributes, subscription tier, geo, etc., you either write custom activation strategies or pay for Unleash Enterprise. The admin UI is functional but not great. I also ran into a few issues with the React SDK where flag updates didn't propagate as quickly as I expected on the client side.
 
-- Offers extensive SDK support.
-- Provides excellent documentation and community support.
-- Advanced user segmentation and targeting capabilities.
+I personally prefer LaunchDarkly for teams that can afford it, mainly because the targeting and the React SDK integration are smoother. But if cost is a concern or your use case is mostly simple on/off toggles, Unleash with self-hosting is perfectly fine.
 
-**Unleash**
+## Setting up flags in React
 
-- Self-hosting means control over deployments.
-- Easier integration for simple feature toggles.
-- Configurable through a flexible API.
-
-Ultimately, we chose LaunchDarkly for its ease of use and powerful rollout options, despite the higher cost.
-
-## Implementing Feature Flags in Code
-
-Handling feature flags directly in your frontend codebase requires careful thought around flag evaluation and UI updates. Here’s how we approached it using React and TypeScript.
-
-### React Hooks for Flags
-
-We wrapped our flag logic in custom hooks, making it reusable and clean.
+The LaunchDarkly React SDK gives you a `useFlags` hook and a `useLDClient` hook. One thing I see people get wrong (and I got wrong the first time) is trying to destructure `ldClient` out of `useFlags`. That's not how it works — `useFlags` just returns the flag values as an object.
 
 ```typescript
-import { useFlags } from 'launchdarkly-react-client-sdk';
+import { useFlags, useLDClient } from 'launchdarkly-react-client-sdk';
 
-// Custom Hook
-function useFeatureFlag(flagName: string, defaultValue: boolean) {
-    const { flags, ldClient } = useFlags();
-
-    return flags[flagName] ?? defaultValue;
+function useFeatureFlag(flagKey: string, defaultValue: boolean = false) {
+  const flags = useFlags();
+  return flags[flagKey] ?? defaultValue;
 }
 
-// Usage example
-const isNewFeatureEnabled = useFeatureFlag('new-feature-toggle', false);
+// if you need the client instance for tracking or identifying users:
+function useFeatureFlagWithTracking(flagKey: string) {
+  const flags = useFlags();
+  const ldClient = useLDClient();
+
+  const trackConversion = (metricKey: string) => {
+    ldClient?.track(metricKey, { flagKey });
+  };
+
+  return {
+    enabled: flags[flagKey] ?? false,
+    trackConversion,
+  };
+}
 ```
 
-### Conditional Rendering with Flags
+I wrap flags in custom hooks like this not because it's architecturally clever, but because flag keys are strings and I don't want them scattered across fifty components. When you inevitably need to rename or retire a flag, having one place to grep is worth the minor abstraction.
 
-We ensure the logic for flag checks is centralized, avoiding scattered conditionals.
+For TypeScript, I define the flag shape upfront:
+
+```typescript
+interface AppFeatureFlags {
+  'checkout-v2': boolean;
+  'new-search-algo': boolean;
+  'promo-banner-holiday': boolean;
+}
+```
+
+This doesn't give you runtime safety — the SDK still returns `LDFlagSet` which is basically `Record<string, any>` — but it helps catch typos during development and gives you autocomplete if you cast the return value.
+
+## Conditional rendering without making a mess
+
+The obvious pattern is ternaries in JSX:
 
 ```tsx
-const FeatureComponent: React.FC = () => {
-    const isEnabled = useFeatureFlag('your-feature-flag', false);
+function ProductPage() {
+  const showNewCheckout = useFeatureFlag('checkout-v2');
 
-    return (
-        <>
-            {isEnabled ? <NewFeature /> : <OldFeature />}
-        </>
-    );
-};
-```
-
-### TypeScript Interface for Flags
-
-Typing your flags ensures they are part of your code contracts, reducing runtime errors.
-
-```typescript
-interface FeatureFlags {
-    'new-feature-toggle': boolean;
-    // Add more flags here
-}
-
-const defaultFlags: FeatureFlags = {
-    'new-feature-toggle': false,
-};
-```
-
-## Crafting Rollout Strategies
-
-Our goal was a smooth, controlled rollout without impacting user experience.
-
-### Percentage Rollout
-
-Starting with a 5% rollout, we progressively scaled.
-
-```typescript
-function shouldRollout(featureFlag: boolean, rolloutPercentage: number) {
-    const roll = Math.random() * 100;
-    return featureFlag && roll < rolloutPercentage;
+  return (
+    <div>
+      <ProductDetails />
+      {showNewCheckout ? <CheckoutV2 /> : <LegacyCheckout />}
+    </div>
+  );
 }
 ```
 
-### User Segment Targeting
-
-Using LaunchDarkly's powerful targeting, we focused on users from specific geos during early phases.
-
-### Gradual Ramp-up
-
-We progressively increased flag exposure by 10% weekly, monitoring impacts.
-
-## A/B Testing and Metrics Collection
-
-Feature flags also helped us integrate A/B testing directly into the rollout phase.
-
-### Using Flags for Experiments
-
-We deployed the new feature as an experiment, comparing user engagement metrics across different segments.
-
-```typescript
-function logExperiment(featureFlag: boolean) {
-    if (featureFlag) {
-        // Log metrics for A/B testing
-    }
-}
-```
-
-### Statistical Significance
-
-We utilized LaunchDarkly’s built-in metrics to verify the statistical significance of our results before going full-scale.
-
-## Flag Lifecycle Management
-
-Good feature flagging requires clear processes for flag management.
-
-### Lifecycle Stages
-
-1. **Creation:** Every flag begins in a dormant state.
-2. **Activation:** Flags are toggled as rollout conditions are met.
-3. **Monitoring:** We actively monitor flag impacts on real-time metrics.
-4. **Retirement:** Once stable, we remove flags to reduce technical debt.
-
-### Managing Permanent vs. Temporary Flags
-
-Our rule: if a flag lasts more than a release cycle, question why. Permanent flags add tech debt and unnecessary complexity.
-
-## Server-side vs Client-side Evaluation
-
-Choosing the right evaluation strategy was crucial. Here’s why we went with client-side:
-
-### Client-side Evaluation Benefits
-
-- **Instant UI updates** without server latency.
-- **Better offline support** by caching decisions.
-- **Reduced server load** since evaluations happen client-side.
-
-### Flickering Prevention
-
-We avoided flickering by preloading flag states before rendering components, ensuring a seamless user experience.
+This is fine for one or two flags. It becomes a problem when you have four flags active on the same page and your render function turns into a decision tree. On one project we had a page with three overlapping flags and the component was basically unreadable. What worked better was pulling the flag checks up and passing resolved props down:
 
 ```tsx
-// SSR considerations
-export const getServerSideProps: GetServerSideProps = async () => {
-    const flags = await fetchFeatureFlagsFromServer();
+function ProductPageContainer() {
+  const showNewCheckout = useFeatureFlag('checkout-v2');
+  const showNewSearch = useFeatureFlag('new-search-algo');
 
-    return {
-        props: { initialFlags: flags },
-    };
-};
-
-// Use in component
-const { initialFlags } = props;
-const isNewFeatureEnabled = initialFlags['new-feature-toggle'];
+  return (
+    <ProductPage
+      checkoutComponent={showNewCheckout ? CheckoutV2 : LegacyCheckout}
+      searchComponent={showNewSearch ? SearchV2 : LegacySearch}
+    />
+  );
+}
 ```
 
-## The Gotcha Moments
+Not revolutionary, but it keeps the actual page component clean and testable. You can test `ProductPage` without mocking any flag provider.
 
-### Scaling Beyond Expectations
+## Rollout strategy — the part that actually matters
 
-We initially underestimated the load during the 50% rollout phase. This led to a momentary spike in our error rates that we had to address by optimizing our backend processes.
+The code integration is honestly the easy part. The rollout strategy is where things get interesting and where I've seen teams mess up.
 
-**Lesson Learned:** Always plan for higher capacity than you estimate during major rollouts.
+### Percentage rollouts
 
-### Misconfigured Flag
+LaunchDarkly handles percentage rollouts natively — you don't need to write your own random number logic. You just configure "serve `true` to 5% of users" in the dashboard and it handles the hashing so the same user consistently gets the same variation. This is important: you want sticky assignment, not random-on-every-request assignment. If a user refreshes and suddenly the feature disappears, you'll get confused bug reports.
 
-An overlooked typo in a flag name caused a minor panic when a critical feature stayed off. This was caught by our error monitoring setup promptly.
+We typically started at 5%, watched error rates and performance metrics for 48 hours, then bumped to 25%, then 50%, then 100%. The 48-hour window caught issues that quick smoke tests missed — things like edge cases in specific browsers, interactions with cached data, or problems that only showed up under certain user states.
 
-**Lesson Learned:** Incorporate type checks and validation tools for all feature flags to prevent misconfigurations.
+### Targeting specific segments first
 
-### Impacts on Performance
+Before doing a percentage rollout to random users, we'd target internal users and beta testers first. LaunchDarkly lets you create user segments and target them with rules. We had a segment for employees (matched on email domain) and another for users who had opted into beta features (a custom attribute we sent during identification).
 
-Monitoring showed our load times slightly increased when multiple flags were active. We optimized by batch evaluating flags client-side.
+One thing that surprised me: you need to be careful about the order of targeting rules. Rules are evaluated top-to-bottom and the first match wins. I once had a "disable for users in Germany" rule below the percentage rollout rule, which meant German users were still getting the feature through the percentage allocation. The fix was just reordering the rules, but it took us a while to figure out why our GDPR-related exclusion wasn't working.
 
-**Lesson Learned:** Regularly assess the performance impact of flag evaluations and adjust as necessary.
+## The flicker problem
 
-## Practical Takeaways
+This one is annoying and not talked about enough. When you evaluate flags client-side, there's a moment between the initial render and when the SDK finishes initialization where you're rendering with default values. If the default is `false` and the flag resolves to `true`, the user sees the old UI flash before the new one appears.
 
-- **Choose the right tool** for your needs; sometimes, the extra cost is worth the extra capabilities.
-- **Keep flag logic centralized** with hooks or contexts in React to avoid messy code.
-- **Regularly clean up** old flags to prevent tech debt.
-- **Monitor everything:** A/B testing and flag impacts need to be part of your rollback strategy.
+The LaunchDarkly React SDK supports bootstrapping — you can pass initial flag values as props to the provider:
 
-Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
+```tsx
+import { LDProvider } from 'launchdarkly-react-client-sdk';
+
+// fetch flags server-side during SSR or in a loader
+const serverFlags = await getServerSideFlags(userId);
+
+<LDProvider
+  clientSideID="your-client-id"
+  context={{ kind: 'user', key: userId }}
+  options={{ bootstrap: serverFlags }}
+>
+  <App />
+</LDProvider>
+```
+
+The `bootstrap` option makes the SDK start with those values immediately, so there's no flash. The SDK still connects to LaunchDarkly in the background and will update if the flag value has changed since the server-side fetch, but the initial render is correct.
+
+If you're not doing SSR, another approach is to delay rendering the flagged component until the SDK is ready. The `useLDClient` hook gives you the client instance and you can check `ldClient.waitForInitialization()`. It's not ideal — you're trading flicker for a loading state — but sometimes that's the better UX.
+
+## Flag lifecycle — a.k.a. the tech debt nobody budgets for
+
+Here's the uncomfortable truth about feature flags: adding them is easy, removing them is a chore that nobody wants to do. On one project we accumulated 47 flags over about 8 months. At least 30 of them were fully rolled out and serving `true` to 100% of users. They were dead code wrapped in conditionals that nobody removed because "it works, why touch it."
+
+The problem is that dead flags make the codebase harder to reason about. New team members don't know if a flag is still being experimented with or if it's been permanent for six months. And the old code path behind the `false` branch? It's rotting. Nobody's testing it anymore, but it's still there, adding to bundle size and cognitive load.
+
+What helped us was a simple rule: when a flag reaches 100% and stays there for two weeks with no issues, a ticket gets auto-created to remove it. We added a `createdAt` field to our flag type definition and wrote a lint rule that warned if a flag was older than 60 days without being marked as permanent.
+
+```typescript
+interface FlagMetadata {
+  key: string;
+  createdAt: string;
+  owner: string;
+  type: 'temporary' | 'permanent';
+  jiraTicket: string;
+}
+
+const FLAG_REGISTRY: FlagMetadata[] = [
+  {
+    key: 'checkout-v2',
+    createdAt: '2024-11-01',
+    owner: 'akin',
+    type: 'temporary',
+    jiraTicket: 'FE-1234',
+  },
+];
+```
+
+The `jiraTicket` for removal gets created at the same time as the flag itself. This was the single most effective thing we did to manage flag debt. If the removal ticket doesn't exist, the flag doesn't get merged.
+
+## Things that bit us
+
+**Stale flag cache on mobile web.** We had users on mobile Safari who were getting served a stale flag value because the service worker was caching the LaunchDarkly streaming connection response. Took us a week to figure out. The fix was excluding the LaunchDarkly endpoints from the service worker's cache strategy.
+
+**Flag evaluation in server components.** When we started migrating to Next.js App Router, our existing `useFlags` hooks obviously didn't work in server components. We had to set up the Node SDK separately for server-side evaluation and pass the results down. The two SDKs (client and server) use different flag evaluation contexts, so we had a brief period where server-rendered content showed a different variation than the client-side hydrated version. Not fun.
+
+**Too many flags on one feature.** We once had a feature with four separate flags: one for the UI, one for the API endpoint, one for the analytics tracking, and one for the email notification. Managing the state matrix of 2^4 = 16 possible combinations was a nightmare. Should've been one flag with the backend reading the same flag value. Lesson learned: one feature, one flag, evaluated in as few places as possible.
+
+## When to skip flags entirely
+
+Not every change needs a flag. Bug fixes, copy changes, style tweaks, internal tooling — just ship them. Flags have overhead: the code complexity, the dashboard management, the cleanup. If you're not planning to do a gradual rollout, an A/B test, or a quick kill switch for a risky change, a flag is just ceremony.
+
+I use flags for: new user-facing features on high-traffic pages, migrations that change data flow, and anything touching payments or checkout. For everything else, a regular deploy behind a well-tested PR is simpler and good enough.
