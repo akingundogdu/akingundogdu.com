@@ -1,196 +1,238 @@
 ---
 title: "Architecture for Large-Scale React Applications: Feature-Sliced Design vs Modular Architecture"
-description: "Dive into organizing large React applications with Feature-Sliced Design and Modular Architecture, focusing on scalable patterns and real-world examples."
+description: "My honest take on Feature-Sliced Design vs modular architecture after using both on large React codebases — what worked, what didn't, and what I'd pick today."
 datetime: "2025-02-19"
 image: ""
 ---
 
-When my team first hit the 100K monthly active users mark on our e-commerce platform, we realized our React codebase was starting to resemble an overgrown jungle. With every feature added, navigating the code felt like wading through thick vines of interdependencies and spaghetti imports. It was time to rethink our architecture, and that led us to explore Feature-Sliced Design (FSD) and modular architectures. Here's how we adapted these concepts for scale.
+I've restructured React codebases more times than I'd like to admit. Somewhere around the third or fourth time you find yourself grepping for where a component actually lives, you start thinking hard about architecture. Over the past few years I've worked with two approaches that keep coming up in conversations: Feature-Sliced Design (FSD) and what I'll loosely call modular architecture. I've shipped production code with both, and I have opinions.
 
-## Feature-Sliced Design (FSD)
+## What Feature-Sliced Design actually is
 
-### Understanding Feature-Sliced Design
+FSD came out of the Russian-speaking frontend community and it's more prescriptive than most people expect. The core idea is that your codebase has strict layers — `app`, `pages`, `widgets`, `features`, `entities`, `shared` — and each layer can only import from layers below it. Within each layer, you organize by business slice.
 
-FSD promotes organizing your codebase according to features rather than technical layers. This involves breaking down the app into slices, segments, and layers such as app, pages, widgets, features, entities, and shared. This approach aligns closely with business functionality, which makes scaling and understanding the codebase easier.
-
-### Implementing FSD: A Dashboard Application Example
-
-Imagine a dashboard app with 50+ features — analytics, user profiles, billing, etc., each feature is organized into its folder structure.
+The folder structure looks something like this:
 
 ```plaintext
 /src
+  /app
+  /pages
+    /dashboard
+  /widgets
+    /user-menu
+  /features
+    /edit-profile
+      /ui
+        EditProfileForm.tsx
+      /model
+        useEditProfile.ts
+      /api
+        updateProfile.ts
   /entities
     /user
-      index.tsx
-      model.ts
-  /features
-    /userProfile
       /ui
-        ProfileCard.tsx
+        UserAvatar.tsx
       /model
-        useProfile.ts
-  /widgets
-    /UserMenu
-      index.tsx
-  /pages
-    /Dashboard
-      index.tsx
+        types.ts
+      /api
+        getUser.ts
+  /shared
+    /ui
+    /lib
+    /api
 ```
 
-In this structure:
-- **Entities** represent business domain objects.
-- **Features** hold isolated functional parts.
-- **Widgets** are larger UI components composed of multiple features.
-- **Pages** import all slices and render the application.
+The strict layering is the whole point. A feature can use entities and shared code, but it can never import from another feature. A widget can compose features, but features don't know about widgets. This is enforced — ideally with lint rules, not just good intentions.
 
-### Code Example: A Profile Feature
+I personally find the layer hierarchy elegant on paper. Where it gets tricky is the `features` vs `entities` distinction. The FSD docs define entities as "business objects" and features as "user actions on those entities." So `user` is an entity, but `editProfile` is a feature. Makes sense until you're staring at some piece of code that fetches a user's subscription status and renders a badge — is that an entity concern or a feature? You'll spend time on these taxonomy debates, especially with a team that's new to FSD.
 
-Here's a simple user profile feature illustrating FSD.
+Here's roughly what a feature looks like in practice:
 
 ```typescript
-// features/userProfile/ui/ProfileCard.tsx
-import React from 'react';
-import { useProfile } from '../model/useProfile';
+// features/edit-profile/model/useEditProfile.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { updateProfile } from '../api/updateProfile';
+import type { User } from '@/entities/user';
 
-export const ProfileCard = () => {
-  const { data, error } = useProfile();
+export function useEditProfile() {
+  const queryClient = useQueryClient();
 
-  if (error) return <div>Error loading profile</div>;
-  if (!data) return <div>Loading...</div>;
-
-  return <div>{data.name}</div>;
-};
-
-// features/userProfile/model/useProfile.ts
-import { useState, useEffect } from 'react';
-import { fetchUserProfile } from '../../entities/user/api';
-
-export const useProfile = () => {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetchUserProfile()
-      .then(response => setData(response))
-      .catch(setError);
-  }, []);
-
-  return { data, error };
-};
+  return useMutation({
+    mutationFn: (data: Partial<User>) => updateProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user', 'me'] });
+    },
+  });
+}
 ```
 
-### Lessons from Implementing FSD
+```tsx
+// features/edit-profile/ui/EditProfileForm.tsx
+import { useEditProfile } from '../model/useEditProfile';
 
-The initial transition was painful. We underestimated the effort required to maintain clear boundaries between slices. Looking back, aligning the slices closely with our Agile stories worked better.
+export function EditProfileForm({ user }: { user: User }) {
+  const { mutate, isPending } = useEditProfile();
 
-## Modular Architecture
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    mutate({ displayName: formData.get('displayName') as string });
+  };
 
-### The Modular Approach
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="displayName" defaultValue={user.displayName} />
+      <button disabled={isPending}>
+        {isPending ? 'Saving...' : 'Save'}
+      </button>
+    </form>
+  );
+}
+```
 
-Modular architecture also segments applications, but focuses on creating self-contained feature and shared modules. This reduces coupling and enhances reusability.
+Nothing revolutionary in the code itself. The value is structural — you know exactly where this lives and what it's allowed to touch.
 
-### Folder Structure: Flat vs Nested
+## Where FSD breaks down
 
-A flat structure for smaller projects helps avoid deeply nested imports. However, in large projects, a nested structure aids organization and team navigation.
+The layer rules are strict, and that strictness cuts both ways. The one that bit me hardest: cross-feature communication. Say you have a `notifications` feature and an `edit-profile` feature, and after a successful profile edit you want to show a toast notification. In FSD, features can't import from each other. So you end up threading this through a shared event bus, or lifting the orchestration up to the widget/page layer.
+
+That's fine architecturally, but in practice it means your page components accumulate a lot of wiring logic. You end up with pages that are basically just glue code connecting features together, and that glue gets messy fast when you have complex user flows.
+
+The other friction point is `shared`. Everything that doesn't fit neatly into the hierarchy gets dumped into `shared`, and without discipline it becomes a junk drawer. I've seen `shared/lib` folders with 40+ files that have nothing in common except "didn't belong anywhere else."
+
+## Modular architecture — the pragmatic alternative
+
+What I'm calling modular architecture is less formal. There's no canonical spec like FSD has. The basic idea: group code by domain module, each module owns its own components, hooks, utils, types, and API calls. Modules can have explicit public APIs (barrel exports) and you enforce boundaries between them.
 
 ```plaintext
 /src
   /modules
-    /analytics
+    /auth
+      /components
+        LoginForm.tsx
+        AuthGuard.tsx
+      /hooks
+        useAuth.ts
+        useSession.ts
+      /api
+        auth.ts
+      /types.ts
+      index.ts        ← public API
+    /billing
       /components
       /hooks
-      /helpers
-    /user
+      /api
+      index.ts
+    /dashboard
       /components
       /hooks
-      /helpers
+      index.ts
+  /shared
+    /components
+    /hooks
+    /utils
 ```
 
-### Dependency Management
+The key difference from FSD: there's no fixed layer hierarchy. You decide on dependency rules per-project. Maybe `auth` is a foundational module that others can import from. Maybe `billing` and `dashboard` are leaf modules that shouldn't know about each other. You document this and enforce it with tooling.
 
-Tools like `eslint-plugin-boundaries` ensure modules don't improperly import from each other, maintaining clear separation of concerns.
+I find this works better for teams that are already mid-project and can't afford to reclassify their entire codebase into entities/features/widgets. You can adopt it incrementally — pull one messy domain out into a clean module, set up its public API, add a lint rule that blocks deep imports, and move on.
 
-```javascript
-// .eslintrc.js
-module.exports = {
-  rules: {
-    'boundaries/no-import-aux': 'error'
-  },
-};
-```
-
-### Code Example: Shared Module
+A module's public API is just a barrel file, but it matters a lot:
 
 ```typescript
-// modules/user/components/UserCard.tsx
-import React from 'react';
-import { useUser } from '../hooks/useUser';
-
-export const UserCard = () => {
-  const { userData } = useUser();
-
-  return userData ? <div>{userData.username}</div> : <div>Loading...</div>;
-};
-
-// modules/user/hooks/useUser.ts
-import { useState, useEffect } from 'react';
-
-export const useUser = () => {
-  const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    // Simulate an API call
-    setTimeout(() => setUserData({ username: 'johndoe' }), 1000);
-  }, []);
-
-  return { userData };
-};
+// modules/auth/index.ts
+export { LoginForm } from './components/LoginForm';
+export { AuthGuard } from './components/AuthGuard';
+export { useAuth } from './hooks/useAuth';
+export { useSession } from './hooks/useSession';
+export type { User, Session } from './types';
 ```
 
-## Lazy Loading and Code Splitting
-
-To address performance, we employed lazy loading, especially at module and feature levels. React's `React.lazy` serves beautifully here.
-
-```typescript
-// App.tsx
-import React, { Suspense, lazy } from 'react';
-const UserPage = lazy(() => import('./pages/UserPage'));
-
-const App = () => (
-  <Suspense fallback={<div>Loading...</div>}>
-    <UserPage />
-  </Suspense>
-);
-```
-
-## The Gotcha: Migration Challenges
-
-Migrating from a tangled mess to an organized architecture wasn't straightforward. My team spent over three sprints on refactoring alone. Initial attempts at migration caused our CI pipeline to break due to uncaught circular dependencies and misconfigured imports.
-
-### Problem: Circular Dependencies
-
-By introducing `eslint-plugin-import`, we detected and fixed these issues early. This experience taught us the importance of maintaining clean import boundaries from the beginning, not just during refactoring.
+Then in your eslint config (using `eslint-plugin-boundaries` or `eslint-plugin-import`), you restrict imports so other modules can only use what's exported from `index.ts`. No reaching into `modules/auth/hooks/useAuth` directly — you go through the barrel.
 
 ```javascript
-// .eslintrc.js
-module.exports = {
-  rules: {
-    'import/no-cycle': 'error',
+// eslint config (flat config style)
+import boundaries from 'eslint-plugin-boundaries';
+
+export default [
+  {
+    plugins: { boundaries },
+    rules: {
+      'boundaries/element-types': ['error', {
+        default: 'disallow',
+        rules: [
+          { from: 'module', allow: ['shared'] },
+          { from: 'module', allow: ['module'], importKind: 'value',
+            condition: { targetNotSelf: true } },
+        ],
+      }],
+    },
   },
-};
+];
 ```
 
-### Problem: Performance Hit
+The config gets more nuanced than this in real life, but you get the idea. The point is that boundaries are enforced by tooling, not by hope.
 
-During migration, we encountered a performance dip. A poorly implemented lazy loading strategy can lead to unnecessary re-renders and code splitting that fragments too much. We solved it by balancing lazy boundaries and ensuring page-level lazy loading wherever possible.
+## My honest comparison
 
-## Closing Thoughts and Takeaways
+I prefer modular architecture for most teams and most projects. Here's why.
 
-Designing a scalable React application isn't merely about picking the latest architecture trend; it's about aligning your codebase structure with your team's workflow and project requirements. Here's what worked for us:
+FSD is great if you're starting fresh with a team that buys into it fully. The rigid structure means less bikeshedding about where things go — the spec tells you. New developers can onboard by reading the FSD docs and immediately understand the project layout. That's genuinely valuable.
 
-- **Align architecture with business logic**: Organize your codebase in a way that reflects real-world business functionality.
-- **Maintain import boundaries**: Use tools to enforce clean separations.
-- **Leverage lazy loading wisely**: Optimize for both performance and developer efficiency.
-- **Iterative migration**: Migrate in phases to manage technical debt without halting feature development.
+But FSD's rigidity becomes a liability when your domain doesn't map cleanly to its layer model. I worked on a project where we had complex multi-step workflows that spanned several "features" and "entities," and the layer rules made the code harder to follow, not easier. We were constantly fighting the architecture instead of using it.
 
-These strategies helped us tame the beast our codebase had become. Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
+Modular architecture gives you the benefits of isolation and clear boundaries without prescribing how deep the hierarchy goes. You get to define the rules that make sense for your project. The downside is that you need a team that has the discipline to actually define and maintain those rules. Without that, modules degrade into the same mess you started with — just with extra folders.
+
+Here's roughly how I think about it:
+
+**Pick FSD if:** you're starting a new project, the team is willing to learn the spec, and your domain maps well to the entity/feature split. Also if you want to hire or scale the team quickly — the standardization helps.
+
+**Pick modular if:** you're refactoring an existing codebase, your domain is complex or doesn't fit neat categories, or your team prefers defining their own conventions. Also if you're working across multiple projects — modular patterns transfer more easily because they're not tied to one spec.
+
+## The migration problem
+
+Regardless of which you pick, migrating an existing codebase is the hard part. Not technically hard — it's mostly moving files around and updating imports. The hard part is doing it without blocking feature work for weeks.
+
+What worked for me: don't try to migrate everything at once. Pick the most painful module — the one where developers keep breaking things because of tangled dependencies — and extract that first. Get the lint rules in place for that one module. Ship features on top of the new structure so the team sees the benefits. Then do the next one.
+
+Circular dependencies will surface during migration and they're annoying to untangle. Turn on `import/no-cycle` early, even before you start restructuring:
+
+```javascript
+rules: {
+  'import/no-cycle': ['error', { maxDepth: 3 }],
+}
+```
+
+I set `maxDepth` because without it the rule can get slow on large codebases — it has to trace every possible import chain. Depth 3 catches the vast majority of real circular deps without tanking your lint times.
+
+One thing that surprised me: the biggest resistance to architectural changes wasn't technical, it was organizational. Developers had mental models of "this file is over here" built up over months, and moving things around broke that. Clear communication and a migration guide that maps old paths to new paths made a real difference.
+
+## Lazy loading at module boundaries
+
+Whatever architecture you choose, module boundaries are natural code-splitting points. I lazy load at the route level and sometimes at the module level for heavy features:
+
+```tsx
+const BillingPage = lazy(() => import('@/modules/billing/pages/BillingPage'));
+const DashboardPage = lazy(() => import('@/modules/dashboard/pages/Dashboard'));
+
+function AppRoutes() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <Routes>
+        <Route path="/billing" element={<BillingPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+      </Routes>
+    </Suspense>
+  );
+}
+```
+
+Don't over-split. I made this mistake once — lazy loaded individual components within a page and ended up with a waterfall of network requests that made the page feel slower, not faster. Route-level splitting is almost always enough. If you need more granular splitting, do it for genuinely heavy components (rich text editors, chart libraries) and nothing else.
+
+## What I'd do on my next project
+
+If I started a new large React app tomorrow, I'd probably go with a modular approach but borrow some ideas from FSD. Specifically, I'd keep FSD's concept of a `shared` layer and the rule that shared code can't import from modules. I'd set up `eslint-plugin-boundaries` on day one, before writing any feature code. And I'd define module boundaries based on team ownership — if two developers own billing, all billing code lives in one module.
+
+I wouldn't adopt full FSD unless the team had used it before, because the learning curve is real and the taxonomy debates slow you down in the early weeks when you should be shipping.
+
+The architecture that works best is the one your team will actually maintain. Pick one, enforce it with tooling, and revisit it when it starts hurting. That's about as honest as advice gets on this topic.
