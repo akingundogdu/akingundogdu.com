@@ -1,191 +1,460 @@
 ---
 title: "Frontend State Management Compared: Redux Toolkit vs Zustand vs Jotai vs XState"
-description: "A practical comparison of Redux Toolkit, Zustand, Jotai, and XState through real-world applications, focusing on performance, devtools, and complexity."
-datetime: "2023-06-27"
+description: "A hands-on comparison of four React state management libraries through the same feature — a multi-step checkout flow — with bundle size analysis, re-render profiling, and a decision framework."
+datetime: "2026-04-28"
 image: ""
 ---
 
-When our e-commerce platform's state management started becoming a tangled web of props and callbacks, my team and I knew it was time for a change. We evaluated Redux Toolkit, Zustand, Jotai, and XState — each within the context of different application types and complexities we were working with. This deep dive is based on those hands-on experiments and the sometimes painful lessons we learned along the way.
+Most state management comparisons list features side by side and call it a day. That is not very useful when you are staring at a new project and trying to decide which library to pull in. The differences only become visible when you build the same feature with each one.
 
-## Redux Toolkit: The Workhorse
+This article implements a multi-step checkout flow — cart, shipping, payment, confirmation — with Redux Toolkit, Zustand, Jotai, and XState. Same requirements, same UI, four different mental models. Along the way, we will measure what actually matters: bundle cost, re-render behavior, and how each library handles the inevitable "we need to add one more step" requirement change.
 
-Redux Toolkit (RTK) is often the go-to for React apps that require a robust and predictable state management solution, especially when complex logic or middleware is involved. I remember when we had to manage 200K products with varying attributes across multiple screens. The verbosity of classic Redux was weighing us down, but RTK streamlined so much for us, starting with **slices**.
+## The Feature: Multi-Step Checkout
 
-### RTK Slices and Middleware
+The checkout flow has four steps. Each step collects data. Steps can be navigated forward and backward. The payment step talks to an async API. The confirmation step summarizes everything. If the user leaves mid-flow and comes back, the state should persist.
+
+This is a realistic feature that exercises every library's strengths and weaknesses: shared state across components, derived state, async operations, state persistence, and complex transitions.
+
+## Redux Toolkit: Structured and Predictable
+
+RTK's mental model is straightforward — one store, slices own their state, reducers describe transitions. For a checkout flow, the structure looks natural:
 
 ```typescript
-import { createSlice, configureStore, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, configureStore, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 
-interface ProductState {
-  items: Array<{ id: string; name: string; price: number }>;
+interface CheckoutState {
+  step: 'cart' | 'shipping' | 'payment' | 'confirmation';
+  shipping: { address: string; city: string; zip: string } | null;
+  payment: { status: 'idle' | 'processing' | 'succeeded' | 'failed'; error: string | null };
+  orderId: string | null;
 }
 
-const initialState: ProductState = { items: [] };
+const processPayment = createAsyncThunk(
+  'checkout/processPayment',
+  async (amount: number) => {
+    const res = await fetch('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    });
+    if (!res.ok) throw new Error('Payment failed');
+    return (await res.json()).orderId as string;
+  }
+);
 
-const productSlice = createSlice({
-  name: 'products',
-  initialState,
+const checkoutSlice = createSlice({
+  name: 'checkout',
+  initialState: {
+    step: 'cart',
+    shipping: null,
+    payment: { status: 'idle', error: null },
+    orderId: null,
+  } as CheckoutState,
   reducers: {
-    addProduct(state, action: PayloadAction<{ id: string; name: string; price: number }>) {
-      state.items.push(action.payload);
+    goToStep(state, action: PayloadAction<CheckoutState['step']>) {
+      state.step = action.payload;
+    },
+    setShipping(state, action: PayloadAction<CheckoutState['shipping']>) {
+      state.shipping = action.payload;
+      state.step = 'payment';
     },
   },
-});
-
-const store = configureStore({
-  reducer: {
-    products: productSlice.reducer,
+  extraReducers: (builder) => {
+    builder
+      .addCase(processPayment.pending, (state) => {
+        state.payment = { status: 'processing', error: null };
+      })
+      .addCase(processPayment.fulfilled, (state, action) => {
+        state.payment = { status: 'succeeded', error: null };
+        state.orderId = action.payload;
+        state.step = 'confirmation';
+      })
+      .addCase(processPayment.rejected, (state, action) => {
+        state.payment = { status: 'failed', error: action.error.message ?? 'Unknown error' };
+      });
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat((storeAPI) => (next) => (action) => {
-      console.log('Logging action: ', action);
-      return next(action);
-    }),
 });
-
-// Usage
-store.dispatch(productSlice.actions.addProduct({ id: '1', name: 'Product A', price: 100 }));
 ```
 
-Even with this setup, we found ourselves debating if the boilerplate was justified. With RTK Query, we abstracted API interactions, reducing blocks of repetitive code. However, when dealing with form-heavy apps, RTK's boilerplate sometimes felt overkill for simple state needs. That's where Zustand came into play.
+The async thunk handles payment processing, and `extraReducers` maps each promise state to a UI state. This is where RTK earns its reputation — the pattern is explicit, every state transition is visible in one place, and Redux DevTools lets you replay the entire checkout flow action by action.
 
-## Zustand: Simple and Minimal
+**The friction**: even with RTK's reduced boilerplate, you still need a `Provider` at the root, typed hooks (`useAppDispatch`, `useAppSelector`), and the mental overhead of actions vs thunks vs selectors. For a checkout flow, this is fine. For a tooltip's open/close state, it is ceremony without payoff.
 
-Zustand quickly became our favorite for projects with straightforward state needs. Its minimal API was a relief after RTK's verbosity. When I first used it on a real-time dashboard project, I appreciated the simplicity and directness.
+### RTK Query for Server State
 
-### Store Slicing and Selectors
+If the checkout also needs to fetch shipping options or validate addresses, RTK Query eliminates the manual loading/error/caching pattern:
 
 ```typescript
-import create from 'zustand';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-interface ZooState {
-  animals: string[];
-  addAnimal: (animal: string) => void;
+const checkoutApi = createApi({
+  reducerPath: 'checkoutApi',
+  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+  endpoints: (builder) => ({
+    getShippingOptions: builder.query<ShippingOption[], string>({
+      query: (zip) => `shipping-options?zip=${zip}`,
+    }),
+    validateAddress: builder.mutation<boolean, Address>({
+      query: (address) => ({ url: 'validate-address', method: 'POST', body: address }),
+    }),
+  }),
+});
+
+export const { useGetShippingOptionsQuery, useValidateAddressMutation } = checkoutApi;
+```
+
+RTK Query's cache invalidation and automatic refetching are genuinely hard to replicate by hand. If your app already uses Redux and needs server state caching, RTK Query is a strong reason to stay in the ecosystem rather than adding TanStack Query alongside it.
+
+## Zustand: Minimal Surface Area
+
+Zustand's pitch is "what if a store was just a hook?" The same checkout flow, stripped to its essentials:
+
+```typescript
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+type Step = 'cart' | 'shipping' | 'payment' | 'confirmation';
+
+interface CheckoutStore {
+  step: Step;
+  shipping: { address: string; city: string; zip: string } | null;
+  paymentStatus: 'idle' | 'processing' | 'succeeded' | 'failed';
+  paymentError: string | null;
+  orderId: string | null;
+
+  setShipping: (data: CheckoutStore['shipping']) => void;
+  processPayment: (amount: number) => Promise<void>;
+  goToStep: (step: Step) => void;
+  reset: () => void;
 }
 
-const useZooStore = create<ZooState>((set) => ({
-  animals: [],
-  addAnimal: (animal) => set((state) => ({ animals: [...state.animals, animal] })),
+const useCheckoutStore = create<CheckoutStore>()(
+  persist(
+    (set) => ({
+      step: 'cart',
+      shipping: null,
+      paymentStatus: 'idle',
+      paymentError: null,
+      orderId: null,
+
+      setShipping: (data) => set({ shipping: data, step: 'payment' }),
+
+      processPayment: async (amount) => {
+        set({ paymentStatus: 'processing', paymentError: null });
+        try {
+          const res = await fetch('/api/payments', {
+            method: 'POST',
+            body: JSON.stringify({ amount }),
+          });
+          if (!res.ok) throw new Error('Payment failed');
+          const { orderId } = await res.json();
+          set({ paymentStatus: 'succeeded', orderId, step: 'confirmation' });
+        } catch (e) {
+          set({ paymentStatus: 'failed', paymentError: (e as Error).message });
+        }
+      },
+
+      goToStep: (step) => set({ step }),
+      reset: () => set({
+        step: 'cart', shipping: null, paymentStatus: 'idle',
+        paymentError: null, orderId: null,
+      }),
+    }),
+    { name: 'checkout-storage' }
+  )
+);
+```
+
+That is the entire state layer. No provider, no boilerplate files, no action types. The `persist` middleware gives us the "resume where you left off" requirement in one line.
+
+**Using it in components** is where Zustand's selector model pays off:
+
+```typescript
+function PaymentStep() {
+  const status = useCheckoutStore((s) => s.paymentStatus);
+  const error = useCheckoutStore((s) => s.paymentError);
+  const processPayment = useCheckoutStore((s) => s.processPayment);
+
+  // This component only re-renders when status, error, or processPayment changes.
+  // Changes to shipping, step, or orderId do not trigger a re-render here.
+}
+```
+
+Each selector subscription is independent. If the shipping step updates its data, the payment step does not re-render. This is Zustand's default behavior — no `React.memo`, no `shallowEqual`, no `createSelector`. You get correct re-render boundaries by writing natural selectors.
+
+**The tradeoff**: Zustand does not enforce structure. Two developers on the same team might organize stores completely differently. There is no middleware ecosystem comparable to Redux's saga/thunk/observable pipeline. For the checkout flow, this is not a problem. For an app with 50 stores, you need team conventions that Zustand will not enforce for you.
+
+## Jotai: Bottom-Up Composition
+
+Jotai inverts the model. Instead of one store that holds everything, you start with small atoms and compose upward. The checkout flow becomes a set of independent pieces:
+
+```typescript
+import { atom } from 'jotai';
+import { atomWithStorage } from 'jotai/utils';
+
+type Step = 'cart' | 'shipping' | 'payment' | 'confirmation';
+
+// Each piece of state is an independent atom
+const stepAtom = atomWithStorage<Step>('checkout-step', 'cart');
+
+const shippingAtom = atomWithStorage<{
+  address: string; city: string; zip: string;
+} | null>('checkout-shipping', null);
+
+const paymentStatusAtom = atom<'idle' | 'processing' | 'succeeded' | 'failed'>('idle');
+const paymentErrorAtom = atom<string | null>(null);
+const orderIdAtom = atom<string | null>(null);
+
+// Derived atom: is the checkout complete?
+const isCheckoutCompleteAtom = atom((get) => {
+  return get(paymentStatusAtom) === 'succeeded' && get(orderIdAtom) !== null;
+});
+
+// Derived atom: summary for confirmation page
+const checkoutSummaryAtom = atom((get) => ({
+  shipping: get(shippingAtom),
+  orderId: get(orderIdAtom),
+  isComplete: get(isCheckoutCompleteAtom),
 }));
 
-// Component usage
-const ZooComponent = () => {
-  const animals = useZooStore((state) => state.animals);
-  const addAnimal = useZooStore((state) => state.addAnimal);
-
-  // Rendering logic...
-};
+// Write atom: encapsulates the payment side effect
+const processPaymentAtom = atom(null, async (get, set, amount: number) => {
+  set(paymentStatusAtom, 'processing');
+  set(paymentErrorAtom, null);
+  try {
+    const res = await fetch('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    });
+    if (!res.ok) throw new Error('Payment failed');
+    const { orderId } = await res.json();
+    set(paymentStatusAtom, 'succeeded');
+    set(orderIdAtom, orderId);
+    set(stepAtom, 'confirmation');
+  } catch (e) {
+    set(paymentStatusAtom, 'failed');
+    set(paymentErrorAtom, (e as Error).message);
+  }
+});
 ```
 
-The state slicing and selector capabilities made it very performant with negligible re-renders. For our CRUD apps, this often landed as the perfect middle ground.
-
-### Performance Profiling
-
-Monitoring component re-renders with Zustand was enlightening. Hooks updating only when their selected slice changed drastically reduced unnecessary renders, albeit this was another lesson learned the hard way when I noticed our dashboard components behaving erratically due to improper selector use.
-
-## Jotai: Atomic Flexibility
-
-Jotai's atomic state model allowed for an innovative bottom-up design approach, giving us nuanced control over complex state dependencies. In a wizard-like UI flow, the ability to derive state using atoms fit perfectly.
-
-### Derived and Async Atoms
+The power shows in derived atoms. `checkoutSummaryAtom` automatically recomputes when any of its dependencies change. You do not manually wire up selectors — Jotai tracks the dependency graph. Components that read `checkoutSummaryAtom` only re-render when the summary actually changes, not when unrelated atoms update.
 
 ```typescript
-import { atom, useAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 
-// Base atom
-const countAtom = atom(0);
+function ConfirmationStep() {
+  const summary = useAtomValue(checkoutSummaryAtom);
 
-// Derived atom
-const doubledAtom = atom((get) => get(countAtom) * 2);
+  // Re-renders only when shipping, orderId, or isComplete changes.
+  // paymentStatus changes during processing do not affect this component.
+}
 
-// Async atom example
-const delayedCountAtom = atom(async (get) => {
-  const count = get(countAtom);
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  return count;
+function PaymentButton({ amount }: { amount: number }) {
+  const processPayment = useSetAtom(processPaymentAtom);
+  const status = useAtomValue(paymentStatusAtom);
+
+  return (
+    <button onClick={() => processPayment(amount)} disabled={status === 'processing'}>
+      {status === 'processing' ? 'Processing...' : 'Pay Now'}
+    </button>
+  );
+}
+```
+
+**Where Jotai excels**: when state naturally decomposes into many small pieces with derivation relationships. A spreadsheet-like UI, a complex filter panel, or a form where fields depend on each other — these are Jotai's sweet spot.
+
+**Where it hurts**: discoverability. In Redux or Zustand, you open one file and see the entire checkout state. In Jotai, atoms can be scattered across multiple files. As the atom count grows, understanding "what depends on what" requires either strict file organization or the Jotai DevTools extension. The mental model shift from "one store" to "atom graph" is real and takes time.
+
+## XState: Explicit State Machines
+
+XState takes a fundamentally different approach. Instead of storing values and mutating them, you model the system as states and transitions. The checkout flow is not "a bag of data that changes" — it is "a machine that moves between well-defined states":
+
+```typescript
+import { setup, assign, fromPromise } from 'xstate';
+
+const processPayment = fromPromise(async ({ input }: { input: { amount: number } }) => {
+  const res = await fetch('/api/payments', {
+    method: 'POST',
+    body: JSON.stringify({ amount: input.amount }),
+  });
+  if (!res.ok) throw new Error('Payment failed');
+  return (await res.json()).orderId as string;
 });
 
-// Component Usage
-const CounterComponent = () => {
-  const [count, setCount] = useAtom(countAtom);
-  const [doubled] = useAtom(doubledAtom);
-
-  // Rendering logic...
-};
-```
-
-The async atoms were particularly useful, although implementing them was a journey through understanding when asynchronous state should be recalculated. One of our form-heavy pages sometimes inexplicably slowed due to unnecessary async computations, a "gotcha" taught by Jotai's flexibility.
-
-## XState: Modeling Complexity
-
-XState excels when UI flows become non-linear and need explicit state definitions. We used it in a healthcare app's scheduling feature, where a patient's appointment flow included multiple branching paths and handoffs.
-
-### State Machines in Practice
-
-```typescript
-import { createMachine, interpret } from 'xstate';
-
-const bookingMachine = createMachine({
-  id: 'booking',
-  initial: 'selectDate',
+const checkoutMachine = setup({
+  types: {
+    context: {} as {
+      shipping: { address: string; city: string; zip: string } | null;
+      orderId: string | null;
+      error: string | null;
+    },
+    events: {} as
+      | { type: 'SUBMIT_SHIPPING'; data: { address: string; city: string; zip: string } }
+      | { type: 'SUBMIT_PAYMENT'; amount: number }
+      | { type: 'BACK' }
+      | { type: 'RESET' },
+  },
+  actors: { processPayment },
+}).createMachine({
+  id: 'checkout',
+  initial: 'cart',
+  context: { shipping: null, orderId: null, error: null },
   states: {
-    selectDate: {
-      on: { NEXT: 'confirmDetails' },
+    cart: {
+      on: { SUBMIT_SHIPPING: { target: 'shipping' } },
     },
-    confirmDetails: {
-      on: { NEXT: 'completed' },
+    shipping: {
+      on: {
+        SUBMIT_SHIPPING: {
+          target: 'payment',
+          actions: assign({ shipping: ({ event }) => event.data }),
+        },
+        BACK: { target: 'cart' },
+      },
     },
-    completed: {
+    payment: {
+      on: {
+        SUBMIT_PAYMENT: { target: 'processing' },
+        BACK: { target: 'shipping' },
+      },
+    },
+    processing: {
+      invoke: {
+        src: 'processPayment',
+        input: ({ event }) => {
+          if (event.type === 'SUBMIT_PAYMENT') return { amount: event.amount };
+          return { amount: 0 };
+        },
+        onDone: {
+          target: 'confirmation',
+          actions: assign({ orderId: ({ event }) => event.output, error: null }),
+        },
+        onError: {
+          target: 'payment',
+          actions: assign({ error: ({ event }) => (event.error as Error).message }),
+        },
+      },
+    },
+    confirmation: {
       type: 'final',
     },
   },
+  on: {
+    RESET: { target: '.cart', actions: assign({ shipping: null, orderId: null, error: null }) },
+  },
 });
-
-// Interpreter
-const service = interpret(bookingMachine).start();
-
-// Transitioning States
-service.send('NEXT');
 ```
 
-Using XState's visual editor simplified communication with non-developers significantly. However, the initial setup and mental overhead were not trivial, which reminded us that state machines are best suited for genuinely complex interactions.
+This is more code, but it buys you something the other libraries cannot express: **impossible states are impossible**. You cannot submit a payment from the cart step. You cannot go back from the confirmation step. The machine definition is a contract — if a transition is not in the config, it cannot happen.
 
-## DevTools and Performance: A Comparison
+```typescript
+import { useMachine } from '@xstate/react';
 
-### Redux Toolkit
+function Checkout() {
+  const [state, send] = useMachine(checkoutMachine);
 
-Redux DevTools shines with time-travel capabilities, making debugging a breeze. The level of action logging provides clarity but may lead to performance issues during high-frequency updates unless carefully managed.
+  switch (true) {
+    case state.matches('cart'):
+      return <CartStep onNext={() => send({ type: 'SUBMIT_SHIPPING' })} />;
+    case state.matches('shipping'):
+      return (
+        <ShippingStep
+          onSubmit={(data) => send({ type: 'SUBMIT_SHIPPING', data })}
+          onBack={() => send({ type: 'BACK' })}
+        />
+      );
+    case state.matches('payment'):
+      return (
+        <PaymentStep
+          error={state.context.error}
+          onSubmit={(amount) => send({ type: 'SUBMIT_PAYMENT', amount })}
+          onBack={() => send({ type: 'BACK' })}
+        />
+      );
+    case state.matches('processing'):
+      return <LoadingSpinner />;
+    case state.matches('confirmation'):
+      return <ConfirmationStep orderId={state.context.orderId!} />;
+  }
+}
+```
 
-### Zustand
+**The payoff**: XState's [Stately visual editor](https://stately.ai) renders the machine as an interactive diagram. Product managers can look at it and say "wait, we need a review step between payment and confirmation." You add a state, wire the transitions, and the feature is specified. This communication value is unique among state management tools.
 
-Zustand’s minimalism extends to its DevTools integration, offering straightforward state inspection without overwhelming the developer, a boon when performance is key.
+**The cost**: the learning curve is steep. State machines, actors, guards, and invoked services are concepts most frontend developers have not worked with. The bundle size is larger (~20KB gzipped for `xstate` + `@xstate/react`). And for simple state — a modal toggle, a counter, a theme preference — XState is dramatically overengineered.
 
-### Jotai
+## Measurable Differences
 
-While Jotai's DevTools are evolving, the bottom-up state approach sometimes made tracking all state dependencies cumbersome, requiring a mental shift.
+### Bundle Size (gzipped)
 
-### XState
+| Library | Core | React bindings | Total |
+|---|---|---|---|
+| Zustand | 1.1 KB | included | **1.1 KB** |
+| Jotai | 2.4 KB | included | **2.4 KB** |
+| Redux Toolkit | 11 KB | 2 KB (react-redux) | **13 KB** |
+| XState | 15 KB | 5 KB (@xstate/react) | **20 KB** |
 
-XState's visual debugger was a game-changer for understanding flow and state transitions in complex systems, albeit at the cost of initial learning curve complexities.
+Zustand is 18x smaller than XState. For an app that ships a single checkout page, this matters. For a large SPA that already ships 500KB of JavaScript, the difference is negligible.
 
-## Real-World Recommendations
+### Re-render Behavior
 
-- **Form-heavy apps**: Start with Zustand for its straightforwardness unless heavy logic dictates RTK.
-- **Real-time dashboards**: Zustand wins for simplicity and performance.
-- **Wizard flows**: Jotai's flexibility shines, while XState becomes invaluable as complexity grows.
-- **CRUD apps**: Forder form simplicity, consider Jotai or Zustand, scaling to RTK if logic requires.
+Tested with React DevTools Profiler — updating the shipping address and measuring which components re-render:
 
-## Migration Strategies: Lessons Learned
+| Library | Components re-rendered on shipping update |
+|---|---|
+| Redux Toolkit (naive `useSelector`) | CartStep, ShippingStep, PaymentStep |
+| Redux Toolkit (granular selectors) | ShippingStep only |
+| Zustand (with selectors) | ShippingStep only |
+| Jotai (atom per field) | ShippingStep only |
+| XState | Checkout (parent), ShippingStep |
 
-Migrating from Redux to Zustand on a multi-tenant project, our team faced unexpected challenges with action typing and selector adjustments. Combining libraries can also benefit certain cases, allowing for tailored use of strengths, though beware of added bundle size complexity.
+Redux re-renders depend entirely on how you write selectors. A `useSelector(state => state.checkout)` grabs the whole slice and re-renders on every change. Zustand and Jotai give you granular subscriptions by default — you have to try to get it wrong. XState re-renders the component that calls `useMachine`, so the parent component always re-renders on state transitions.
 
-Personally, when building new apps, I often start simple and scale with complexity. This allows flexibility, committing to RTK or XState only when logic dictates.
+### DevTools
 
-## Key Takeaways
+- **Redux DevTools**: Time-travel debugging, action replay, state diffing. The gold standard. You can export a session and share it with a teammate for debugging.
+- **Zustand**: Opt-in via `devtools` middleware, shows state snapshots in Redux DevTools. No time-travel.
+- **Jotai**: The `jotai-devtools` package shows atom values and dependency graphs. Useful but less mature.
+- **XState**: Stately Inspector visualizes state machines in real-time, shows current state, context, and available transitions. Best for understanding flow logic, less useful for raw data inspection.
 
-- Assess application needs versus library complexity — over-engineering looms ever-present.
-- DevTool support varies; choose what aligns with your debugging style.
-- Performance boils down to proper configuration and understanding library nuances.
-- Combining libraries in one app can bridge gaps, but at the cost of added complexity.
+## When to Use What
 
-Thanks for reading. If you found this comparison useful, feel free to reach out — I’m always up for discussing how to architect better frontends. See you in the next one.
+This is not about which library is "best." It is about matching the tool to the problem:
+
+**Zustand** when you need shared client state with minimal ceremony. Shopping cart, UI preferences, notification queue, sidebar state. It is the right default for most React apps in 2026 — especially since React Server Components handle server data, leaving only genuine client state for a store.
+
+**Jotai** when state is naturally atomic and heavily derived. Complex filter UIs, spreadsheet-like interfaces, forms where field B depends on field A which depends on a remote validation of field C. The dependency graph model eliminates manual memoization.
+
+**Redux Toolkit** when the team is large (10+ developers) and needs enforced conventions, or when RTK Query's server-state caching fits the architecture. Also when you need an audit trail of every state change for debugging or compliance.
+
+**XState** when the logic has explicit states with guarded transitions — multi-step wizards, WebSocket connection lifecycle, retry/backoff flows, or any feature where "what transitions are valid from this state?" is a critical question. Not for storing data, but for modeling behavior.
+
+### Combining Libraries
+
+These are not mutually exclusive. A practical architecture in 2026:
+
+- **TanStack Query** for server state (API data, caching, revalidation)
+- **Zustand** for client state (UI state, preferences, ephemeral data)
+- **XState** for complex flows (checkout, onboarding, file upload with retry)
+
+This keeps each tool in its sweet spot and avoids forcing any single library to handle problems it was not designed for.
+
+## Migration Cheat Sheet
+
+If you are moving away from Redux, here is a pragmatic approach:
+
+**Redux → Zustand**: Map each slice to a Zustand store. Redux selectors translate almost directly to Zustand selectors. The biggest change is moving from dispatching actions to calling store methods directly. Migrate one slice at a time — both can coexist.
+
+```typescript
+// Redux
+dispatch(setShipping(data));
+const shipping = useSelector((state) => state.checkout.shipping);
+
+// Zustand
+useCheckoutStore.getState().setShipping(data);
+const shipping = useCheckoutStore((s) => s.shipping);
+```
+
+**Redux → Jotai**: Break each slice field into an atom. Derived selectors become derived atoms. This is a bigger mental shift — you are decomposing a centralized store into a distributed atom graph. Start with one feature, not the entire app.
+
+**Any → XState**: XState typically does not replace your data store. It replaces your `useState` + `useEffect` state machine that you did not realize was a state machine. Look for components with multiple boolean flags (`isLoading`, `isError`, `isRetrying`, `hasSubmitted`) — those are implicit state machines waiting to be made explicit.
