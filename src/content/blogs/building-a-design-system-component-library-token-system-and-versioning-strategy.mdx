@@ -1,233 +1,403 @@
 ---
 title: "Building a Design System: Component Library, Token System, and Versioning Strategy"
-description: "A comprehensive guide to creating and managing a design system in large organizations, including component libraries, design token management, and versioning strategies."
+description: "How we built a design system for 4 product teams — the token architecture that actually scaled, the component API decisions we got wrong, and why our first versioning strategy nearly killed adoption."
 datetime: "2024-09-29"
 image: ""
 ---
 
-I remember the day when our design team introduced the idea of consolidating our scattered UI components into a cohesive design system. Our product line was expanding rapidly, and inconsistencies in design were becoming glaringly obvious. I was tasked with spearheading the effort and quickly realized that creating a design system wasn’t just about aesthetics—it was a strategic decision with far-reaching implications for consistency and efficiency.
+We had 4 product teams, 3 different button components, and a modal that looked different on every page. The final straw was a design review where our CPO put two screens side by side and asked, "Are these the same product?" They were. That's when we got the mandate to build a design system.
 
-## Component Library Architecture
+Eight months later, we had a system serving 4 teams across 6 applications, with 87% component adoption and a token architecture that survived a complete rebrand. But the path there was messy. We made bad API decisions that forced a major version bump at the worst possible time, picked a token structure that couldn't handle theming until we rewrote it, and almost killed adoption by shipping breaking changes in a patch release.
 
-When setting out to build our component library, the first big decision was the structure. We opted for an atomic design approach, breaking down our components into atoms, molecules, and organisms. This method provided the flexibility to combine smaller, reusable components into more complex structures.
+## Token Architecture: Two Rewrites to Get It Right
 
-### Atomic Design
+Most design system articles start with components. We made that mistake too. Our first attempt was a component library with hardcoded colors — `bg-blue-500` scattered across 40 components. When the brand team changed the primary color from `#0070f3` to `#0055d4`, we had a 200-line diff touching every component file.
 
-Here’s how we structured a simple button component:
+Tokens should come first. They're the foundation everything else sits on.
 
-```typescript
-// atoms/Button.tsx
-import React, { ButtonHTMLAttributes } from 'react';
+### Attempt 1: Flat Tokens (Failed at Theming)
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant: 'primary' | 'secondary';
-}
-
-export const Button: React.FC<ButtonProps> = ({ variant, children, ...props }) => {
-  const baseClass = 'px-4 py-2 font-semibold rounded';
-  const variantClass = variant === 'primary' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black';
-  
-  return (
-    <button className={`${baseClass} ${variantClass}`} {...props}>
-      {children}
-    </button>
-  );
-};
-```
-
-This small component can then be integrated into larger, more complex components (molecules) while maintaining consistency through shared CSS classes.
-
-### Compound Components
-
-For more complex interactions, we employed compound components. This pattern proved invaluable for components like dropdowns, where individual parts like `DropdownButton`, `DropdownMenu`, and `DropdownItem` needed to work seamlessly together.
-
-```typescript
-// molecules/Dropdown.tsx
-import React, { useState, useContext, createContext } from 'react';
-
-interface DropdownContextProps {
-  isOpen: boolean;
-  toggle: () => void;
-}
-
-const DropdownContext = createContext<DropdownContextProps | undefined>(undefined);
-
-const Dropdown: React.FC = ({ children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const toggle = () => setIsOpen(!isOpen);
-
-  return (
-    <DropdownContext.Provider value={{ isOpen, toggle }}>
-      <div className="relative">{children}</div>
-    </DropdownContext.Provider>
-  );
-};
-
-const DropdownButton: React.FC = ({ children }) => {
-  const context = useContext(DropdownContext);
-
-  if (!context) throw new Error('DropdownButton must be used within a Dropdown');
-
-  return (
-    <button onClick={context.toggle} className="dropdown-button">
-      {children}
-    </button>
-  );
-};
-
-const DropdownMenu: React.FC = ({ children }) => {
-  const context = useContext(DropdownContext);
-
-  if (!context) throw new Error('DropdownMenu must be used within a Dropdown');
-
-  return context.isOpen ? <div className="dropdown-menu">{children}</div> : null;
-};
-
-// Usage
-// <Dropdown>
-//   <DropdownButton>Menu</DropdownButton>
-//   <DropdownMenu>
-//     <DropdownItem>Option 1</DropdownItem>
-//     <DropdownItem>Option 2</DropdownItem>
-//   </DropdownMenu>
-// </Dropdown>
-```
-
-### Headless Components
-
-We also explored headless components, separating logic from presentation. This allowed teams to provide their custom styling while using shared component logic, such as state management.
-
-## Design Tokens
-
-Design tokens were a revelation in standardizing our design language across platforms. We used JSON and YAML formats to define color, spacing, and typography tokens, which can be easily transformed using tools like Style Dictionary.
-
-### Example JSON Tokens
+Our first token file looked like every tutorial example:
 
 ```json
 {
   "color": {
-    "primary": {
-      "value": "#0070f3"
-    },
-    "secondary": {
-      "value": "#ff4081"
-    }
+    "primary": { "$value": "#0055d4" },
+    "secondary": { "$value": "#6c47ff" },
+    "error": { "$value": "#dc2626" },
+    "background": { "$value": "#ffffff" },
+    "text": { "$value": "#111827" }
   },
   "spacing": {
-    "small": {
-      "value": "8px"
+    "xs": { "$value": "4px" },
+    "sm": { "$value": "8px" },
+    "md": { "$value": "16px" },
+    "lg": { "$value": "24px" }
+  }
+}
+```
+
+This worked for a week — until someone asked about dark mode. With flat tokens, dark mode means duplicating every color with a `-dark` suffix and conditionally switching. We tried it. The result was components littered with `isDark ? tokens.backgroundDark : tokens.background`. Every new component needed to handle this branching, and developers forgot half the time.
+
+### Attempt 2: Three-Tier Tokens (What Actually Scaled)
+
+We restructured into three tiers after studying how Salesforce Lightning and Adobe Spectrum handle this:
+
+```json
+{
+  "primitive": {
+    "blue": {
+      "50":  { "$value": "#eff6ff" },
+      "500": { "$value": "#0055d4" },
+      "600": { "$value": "#0044aa" },
+      "900": { "$value": "#1e3a5f" }
     },
-    "large": {
-      "value": "16px"
+    "neutral": {
+      "0":   { "$value": "#ffffff" },
+      "50":  { "$value": "#f9fafb" },
+      "900": { "$value": "#111827" },
+      "1000": { "$value": "#000000" }
+    }
+  },
+  "semantic": {
+    "color": {
+      "bg-primary":   { "$value": "{primitive.neutral.0}" },
+      "bg-secondary": { "$value": "{primitive.neutral.50}" },
+      "text-primary": { "$value": "{primitive.neutral.900}" },
+      "interactive":  { "$value": "{primitive.blue.500}" },
+      "interactive-hover": { "$value": "{primitive.blue.600}" },
+      "danger":       { "$value": "{primitive.red.500}" }
+    }
+  },
+  "component": {
+    "button": {
+      "primary-bg":    { "$value": "{semantic.color.interactive}" },
+      "primary-hover":  { "$value": "{semantic.color.interactive-hover}" },
+      "primary-text":  { "$value": "{primitive.neutral.0}" },
+      "border-radius": { "$value": "{semantic.radius.md}" },
+      "padding-x":    { "$value": "{semantic.spacing.lg}" },
+      "padding-y":    { "$value": "{semantic.spacing.sm}" }
     }
   }
 }
 ```
 
-Transforming these tokens with Style Dictionary ensured that our design system remained consistent no matter the platform.
-
-```bash
-style-dictionary build
-```
-
-### Theming
-
-Supporting multiple themes, dark mode, and brand variations was non-negotiable. We opted to use CSS custom properties for dynamic theming combined with JavaScript tokens for JS-consumable styles.
+The key insight: **primitives never appear in component code**. Components reference semantic tokens, which reference primitives. Dark mode becomes a semantic layer swap — the primitive palette stays identical, you just remap `bg-primary` from `neutral.0` to `neutral.1000`.
 
 ```typescript
-// theme.ts
-export const themes = {
+const themes = {
   light: {
-    '--bg-color': '#ffffff',
-    '--text-color': '#000000',
+    "color-bg-primary": "var(--primitive-neutral-0)",
+    "color-bg-secondary": "var(--primitive-neutral-50)",
+    "color-text-primary": "var(--primitive-neutral-900)",
+    "color-interactive": "var(--primitive-blue-500)",
   },
   dark: {
-    '--bg-color': '#000000',
-    '--text-color': '#ffffff',
+    "color-bg-primary": "var(--primitive-neutral-1000)",
+    "color-bg-secondary": "var(--primitive-neutral-900)",
+    "color-text-primary": "var(--primitive-neutral-0)",
+    "color-interactive": "var(--primitive-blue-400)",
   },
-};
-
-export function applyTheme(themeName: 'light' | 'dark') {
-  const theme = themes[themeName];
-  Object.keys(theme).forEach(key => {
-    document.documentElement.style.setProperty(key, theme[key]);
-  });
-}
+} as const;
 ```
 
-## Storybook and Chromatic
+Components don't know which theme is active. They reference `--color-bg-primary` and get the right value. When we did the rebrand six months in, we changed 14 primitive values and everything propagated automatically. Zero component changes.
 
-Storybook became our go-to for component documentation and visual testing. Using stories combined with interactive controls allowed designers and developers to collaborate seamlessly.
+### Style Dictionary Transform Pipeline
+
+We used Style Dictionary to transform tokens into platform outputs. Our config handled CSS custom properties, TypeScript constants, and Tailwind theme extension from a single source:
+
+```javascript
+// style-dictionary.config.js
+module.exports = {
+  source: ["tokens/**/*.json"],
+  platforms: {
+    css: {
+      transformGroup: "css",
+      buildPath: "dist/css/",
+      files: [{
+        destination: "variables.css",
+        format: "css/variables",
+        options: { outputReferences: true },
+      }],
+    },
+    ts: {
+      transformGroup: "js",
+      buildPath: "dist/ts/",
+      files: [{
+        destination: "tokens.ts",
+        format: "javascript/es6",
+      }],
+    },
+    tailwind: {
+      transformGroup: "js",
+      buildPath: "dist/tailwind/",
+      files: [{
+        destination: "theme.js",
+        format: "custom/tailwind",
+      }],
+    },
+  },
+};
+```
+
+The `outputReferences: true` flag is critical — it preserves the alias chain in CSS output, so `--button-primary-bg` resolves to `var(--color-interactive)` rather than a hardcoded hex. This means you can inspect token relationships in DevTools, which saved us hours of debugging.
+
+## Component API Design: The Decisions That Mattered
+
+We built 34 components over 8 months. The API decisions we made in the first month shaped (and sometimes haunted) us for the rest.
+
+### Polymorphic `as` Prop vs. Dedicated Components
+
+Our first Button component had an `as` prop for rendering as different elements:
 
 ```typescript
-// Button.stories.tsx
-import React from 'react';
-import { ComponentStory, ComponentMeta } from '@storybook/react';
-
-import { Button } from './Button';
-
-export default {
-  title: 'Components/Button',
-  component: Button,
-  argTypes: {
-    variant: { control: 'select', options: ['primary', 'secondary'] },
-  },
-} as ComponentMeta<typeof Button>;
-
-const Template: ComponentStory<typeof Button> = (args) => <Button {...args} />;
-
-export const Primary = Template.bind({});
-Primary.args = {
-  variant: 'primary',
-  children: 'Primary Button',
-};
-
-export const Secondary = Template.bind({});
-Secondary.args = {
-  variant: 'secondary',
-  children: 'Secondary Button',
-};
+// Version 1: Polymorphic — seemed flexible
+<Button as="a" href="/dashboard">Go to Dashboard</Button>
+<Button as="button" type="submit">Submit</Button>
+<Button as={Link} to="/settings">Settings</Button>
 ```
 
-Coupled with Chromatic, we implemented automated visual regression testing. This saved us during an upgrade when a button style inadvertently affected a modal, catching it before reaching production.
+The problem: TypeScript inference for polymorphic components is a nightmare. The `href` prop should only be valid when `as="a"`, `to` only when `as={Link}`, `type` only when `as="button"`. We spent 3 days on the type definition and it still had edge cases where autocompletion broke.
 
-## Versioning and Publishing
+We switched to dedicated components:
 
-Semantic versioning was critical for managing changes and ensuring backward compatibility within our library. We defined breaking changes strictly to include any modification altering the user interface or component behavior.
+```typescript
+// Version 2: Explicit — boring but correct
+<ButtonLink href="/dashboard">Go to Dashboard</ButtonLink>
+<Button type="submit">Submit</Button>
+<ButtonRouterLink to="/settings">Settings</ButtonRouterLink>
+```
 
-### Gotcha: The Disappearing Icon
+Each component has tight, correct types. No runtime errors from passing `href` to a `<button>`. The trade-off is more exports, but IDE autocompletion works perfectly and wrong usage is a compile error, not a runtime surprise.
 
-One memorable incident involved a minor version update that inadvertently removed an icon from a component, causing consistency scores to drop in dozens of products. Our lesson? Even minor updates must undergo rigorous testing and communication across teams.
+### Compound Components for Complex State
 
-Publishing strategies included using a monorepo setup and npm packages to allow for seamless integration. Tools like Lerna and changesets facilitated managing package versions and ensuring smooth publishing workflows.
+For components with shared internal state — Tabs, Accordion, Dropdown — we used compound components with context. But we added one thing most examples skip: **controlled and uncontrolled modes**.
 
-```json
-// package.json
-{
-  "name": "my-design-system",
-  "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "devDependencies": {
-    "lerna": "^4.0.0"
-  }
+```typescript
+interface TabsProps {
+  value?: string;             // controlled
+  defaultValue?: string;      // uncontrolled
+  onValueChange?: (value: string) => void;
+}
+
+function Tabs({ value, defaultValue, onValueChange, children }: TabsProps) {
+  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
+  const isControlled = value !== undefined;
+  const currentValue = isControlled ? value : internalValue;
+
+  const handleChange = useCallback((newValue: string) => {
+    if (!isControlled) setInternalValue(newValue);
+    onValueChange?.(newValue);
+  }, [isControlled, onValueChange]);
+
+  return (
+    <TabsContext.Provider value={{ value: currentValue, onChange: handleChange }}>
+      <div role="tablist">{children}</div>
+    </TabsContext.Provider>
+  );
+}
+
+function Tab({ value, children }: { value: string; children: ReactNode }) {
+  const ctx = useContext(TabsContext);
+  if (!ctx) throw new Error("Tab must be used within Tabs");
+
+  return (
+    <button
+      role="tab"
+      aria-selected={ctx.value === value}
+      onClick={() => ctx.onChange(value)}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TabPanel({ value, children }: { value: string; children: ReactNode }) {
+  const ctx = useContext(TabsContext);
+  if (!ctx) throw new Error("TabPanel must be used within Tabs");
+  if (ctx.value !== value) return null;
+
+  return <div role="tabpanel">{children}</div>;
 }
 ```
 
-## Adoption Metrics
+Supporting both modes matters because some consumers manage tab state in URL params (controlled), while others just need a tabbed UI (uncontrolled). If you force one pattern, half your users will build a wrapper around your component.
 
-Tracking adoption across teams was more than a vanity metric; it was a feedback loop for continuous improvement. We used component coverage metrics, consistency scores, and tracked usage across repos to determine impact and areas needing attention.
+### The Styling Decision: Why We Chose CSS Modules + Token Variables
 
-## The Gotchas and Lessons Learned
+We evaluated four approaches:
 
-1. **Communication is Key**: A design system is not just for developers; regular conversations with designers and stakeholders prevent misalignment.
+| Approach | Pros | Cons |
+|---|---|---|
+| Tailwind classes | Fast iteration, familiar | Hard to override, utility explosion in complex components |
+| CSS-in-JS (styled-components) | Colocated, dynamic | Runtime cost (~8KB), SSR complexity, React 19 concerns |
+| CSS Modules + custom properties | Zero runtime, overridable | Separate files, less dynamic |
+| Vanilla Extract | Type-safe, zero runtime | Build tooling requirement, smaller ecosystem |
 
-2. **Versioning Discipline**: Define your breaking changes and semantic versioning policies strictly before you launch. Retrospecting after deployment is too late.
+We chose CSS Modules with token-based custom properties. The deciding factor: **consumers need to override styles without fighting specificity wars**.
 
-3. **Automate Everything**: From visual regression tests to token transformations, automation is not just an efficiency gain but a quality assurance asset.
+```css
+/* Button.module.css */
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--button-gap, var(--spacing-sm));
+  padding: var(--button-padding-y) var(--button-padding-x);
+  border-radius: var(--button-border-radius);
+  font-weight: 600;
+  transition: background-color 150ms ease;
+}
 
-## Closing Thoughts
+.primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
 
-Building a design system is a journey, not a destination. It requires continuous iteration and collaboration across disciplines. I hope my insights save you some headaches on your design system journey. Thanks for reading. If you have any questions or want to share your experiences, I'm all ears. Until next time, keep designing and coding with purpose.
+.primary:hover {
+  background: var(--button-primary-hover);
+}
+```
+
+Every visual property references a CSS custom property with a fallback. Consumers can override any specific button token without touching the component:
+
+```css
+/* In consuming application */
+.checkout-cta {
+  --button-primary-bg: var(--color-success);
+  --button-primary-hover: var(--color-success-hover);
+  --button-padding-x: var(--spacing-xl);
+}
+```
+
+No `!important`, no specificity hacks. This pattern came from studying how Radix UI and Open Props handle customization.
+
+## Versioning: How a Patch Release Almost Killed Adoption
+
+We followed semver from day one. Major for breaking changes, minor for new components, patch for bug fixes. Simple, right?
+
+### The Incident
+
+In `v1.4.2` (a patch release), we fixed an accessibility bug in the `Select` component — the dropdown wasn't getting focus when opened via keyboard. The fix added `autoFocus` to the listbox element. Correct behavior per WAI-ARIA.
+
+What we didn't anticipate: 3 teams had built custom focus management on top of our Select. Our "fix" meant focus jumped twice — once from their code, once from ours. Two teams had e2e test suites that broke. One team's form wizard started skipping steps because their focus logic conflicted with ours.
+
+A bug fix in a patch release broke production for 3 teams. Technically we were right — it was a bug fix. Practically, any behavioral change that existing code depends on is a breaking change, regardless of what semver says.
+
+### What We Changed
+
+After that incident, we adopted stricter rules:
+
+1. **Any behavioral change gets a minor version**, even bug fixes. We tag the PR as `fix` but release as `minor`. The only patches are typo fixes in docs, dependency bumps, and build tooling changes.
+
+2. **Changesets over Lerna**. We switched from Lerna to [Changesets](https://github.com/changesets/changesets) because it forces developers to describe the user-facing impact of every PR:
+
+```markdown
+---
+"@acme/design-system": minor
+---
+
+Select: dropdown now receives focus when opened via keyboard.
+
+**Migration**: If you have custom focus management on the Select component,
+you may need to remove your manual `focus()` call to avoid double-focus.
+```
+
+3. **Canary releases for risky changes**. Any PR that touches event handling, focus management, or layout gets a canary release first:
+
+```bash
+# CI publishes to a scoped tag
+npm publish --tag canary
+
+# Teams can test before it hits latest
+npm install @acme/design-system@canary
+```
+
+4. **Codemods for breaking changes**. When we did ship `v2.0.0` (renamed 12 props for consistency), we shipped a codemod alongside it:
+
+```bash
+npx @acme/design-system-codemods v2 ./src
+```
+
+The codemod handled 90% of migrations automatically. Teams that would have delayed upgrading for months did it in a day.
+
+## Measuring Adoption: Beyond "Who's Using It"
+
+We tracked three metrics that actually drove decisions:
+
+### 1. Component Coverage
+
+A script that scans consuming repos for native HTML elements that have design system equivalents:
+
+```typescript
+// Simplified version of our coverage scanner
+const COMPONENT_MAP: Record<string, string> = {
+  "<button": "Button/ButtonLink",
+  "<input": "Input/TextField",
+  "<select": "Select",
+  "<dialog": "Modal/Dialog",
+  "<table": "DataTable",
+};
+
+function scanFile(content: string, filePath: string): CoverageIssue[] {
+  const issues: CoverageIssue[] = [];
+  for (const [htmlTag, dsComponent] of Object.entries(COMPONENT_MAP)) {
+    const regex = new RegExp(`${htmlTag}[\\s>]`, "g");
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      if (!isInsideDesignSystemComponent(filePath)) {
+        issues.push({
+          file: filePath,
+          line: getLineNumber(content, match.index),
+          htmlTag,
+          suggestion: dsComponent,
+        });
+      }
+    }
+  }
+  return issues;
+}
+```
+
+We ran this weekly and published results per team. Starting at 34% coverage, we hit 87% in 6 months. The remaining 13% was mostly edge cases where teams legitimately needed custom elements (canvas-heavy features, third-party widget wrappers).
+
+### 2. Token Drift
+
+A lint rule that flags hardcoded values where tokens exist:
+
+```typescript
+// ESLint rule: no-hardcoded-colors
+// Flags: style={{ color: '#333' }}
+// Suggests: style={{ color: 'var(--color-text-primary)' }}
+```
+
+Token drift dropped from 240 instances to 18 over 4 months. The remaining ones were all in test fixtures and storybook decorators — acceptable.
+
+### 3. Override Frequency
+
+We instrumented our CSS to detect when consumers override design system custom properties. High override frequency on a specific token means the default isn't working for real use cases — it's a signal to revisit the token value or add a variant.
+
+```typescript
+function trackOverrides(componentName: string, element: HTMLElement) {
+  const computedStyle = getComputedStyle(element);
+  const dsTokens = Array.from(document.styleSheets)
+    .flatMap(sheet => Array.from(sheet.cssRules))
+    .filter(rule => rule.cssText.includes(`--${componentName}-`));
+
+  // Compare computed values against design system defaults
+  // Report significant deviations to analytics
+}
+```
+
+When we saw that 60% of consumers overrode `--button-padding-x` to a larger value, we added a `size="lg"` variant instead of leaving everyone to hack the token.
+
+## What I'd Do Differently
+
+**Start with fewer components.** We launched with 20 components. Half of them had design issues that required breaking API changes within the first two months. If we'd launched with 8 well-tested components and added the rest incrementally, we'd have avoided the painful `v2.0.0`.
+
+**Invest in a Figma-to-token pipeline from day one.** We manually synced Figma variables and JSON tokens for 4 months. They drifted constantly. When we finally set up Tokens Studio to sync Figma variables directly to our token JSON in Git, the "designer changed it but forgot to tell engineering" category of bugs dropped to zero.
+
+**Don't build what Radix/Headless UI already solved.** We built our own headless Combobox, Tooltip, and Dialog from scratch. Each one had accessibility issues that took weeks to fix. For complex interactive patterns (focus trapping, scroll locking, portal rendering), use a headless library and build your styled layer on top. Save your engineering time for the components that are truly unique to your product.
+
+**Make the design system a product, not a project.** Projects end. Our system started losing momentum around month 5 when the initial mandate energy faded. What saved it was treating the design system like a product: dedicated backlog, sprint reviews with consuming teams, a Slack channel where teams could request components, and a quarterly roadmap. The moment you stop actively maintaining it, teams start building around it instead of with it.
