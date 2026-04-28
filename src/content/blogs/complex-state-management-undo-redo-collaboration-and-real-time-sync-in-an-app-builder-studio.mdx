@@ -1,0 +1,243 @@
+---
+title: "Complex State Management: Undo/Redo, Collaboration, and Real-Time Sync in an App Builder Studio"
+description: "What I learned building undo/redo, real-time collaboration, and state synchronization into a studio-style app — the patterns that worked, the ones that didn't, and the stuff nobody warns you about."
+datetime: "2024-04-22"
+image: ""
+---
+
+I spent the better part of a year working on a web-based builder tool — think something between Figma and a low-code app studio. The kind of product where users drag components onto a canvas, wire up data bindings, tweak styles, and expect everything to just work: undo, redo, multiple people editing at once, changes syncing in real time.
+
+State management for this kind of app is a completely different beast compared to your typical CRUD frontend. You're not just updating a form or fetching a list. You're maintaining a massive, deeply nested document that multiple users can mutate simultaneously, and every mutation needs to be reversible. I want to talk about the patterns and tradeoffs I ran into, because a lot of the existing material on this topic is either too academic or too shallow.
+
+## Undo/Redo is harder than you think
+
+Everyone's first instinct for undo/redo is the command pattern. You create an interface with `execute()` and `undo()`, stack commands up, pop them off. Straightforward, right?
+
+```typescript
+interface Command {
+  execute(): void;
+  undo(): void;
+}
+
+class MoveElementCommand implements Command {
+  private prevX: number;
+  private prevY: number;
+
+  constructor(
+    private store: CanvasStore,
+    private elementId: string,
+    private newX: number,
+    private newY: number
+  ) {
+    const el = store.getElement(elementId);
+    this.prevX = el.x;
+    this.prevY = el.y;
+  }
+
+  execute() {
+    this.store.updateElement(this.elementId, { x: this.newX, y: this.newY });
+  }
+
+  undo() {
+    this.store.updateElement(this.elementId, { x: this.prevX, y: this.prevY });
+  }
+}
+```
+
+This works fine for simple cases. The problem starts when you have compound operations. A user drags a group of five elements — that's one undo step, but five mutations underneath. Or they paste a component tree that contains nested children with auto-generated IDs. Your command now needs to capture and reverse all of that atomically.
+
+We initially tried to handle this by nesting commands inside a `BatchCommand`, but it got messy fast. The ordering of undo within a batch matters — you have to reverse in the opposite order of execution, and if any sub-command has side effects that depend on another sub-command's state, you're in trouble. We hit a bug where undoing a batch that included both a "create element" and "reparent element" command would try to reparent something that had already been deleted by the undo of the create. That one took two days to track down.
+
+## Immer patches changed our approach
+
+Eventually I moved away from hand-written command objects and leaned on Immer's patch system instead. The idea is simple: instead of writing explicit `undo()` logic, you let Immer record what changed (as JSON patches) and what the inverse of that change is.
+
+```typescript
+import { produce, enablePatches, applyPatches, Patch } from "immer";
+
+enablePatches();
+
+type UndoEntry = {
+  patches: Patch[];
+  inversePatches: Patch[];
+  description: string;
+};
+
+const undoStack: UndoEntry[] = [];
+const redoStack: UndoEntry[] = [];
+
+function applyMutation(
+  state: AppState,
+  description: string,
+  mutator: (draft: AppState) => void
+): AppState {
+  let patches: Patch[] = [];
+  let inversePatches: Patch[] = [];
+
+  const nextState = produce(state, mutator, (p, ip) => {
+    patches = p;
+    inversePatches = ip;
+  });
+
+  undoStack.push({ patches, inversePatches, description });
+  redoStack.length = 0;
+  return nextState;
+}
+
+function undo(state: AppState): AppState {
+  const entry = undoStack.pop();
+  if (!entry) return state;
+  redoStack.push(entry);
+  return applyPatches(state, entry.inversePatches);
+}
+```
+
+I personally prefer this over the command pattern for a few reasons. You don't have to write a separate command class for every possible mutation. The patches are serializable, so you can persist undo history or send it over the wire. And compound operations are trivial — just group multiple mutations in a single `produce` call and you get one set of patches covering everything.
+
+The downside is you lose the semantic meaning of what happened. A patch just says "field X changed from A to B." A command object can carry metadata like "user moved element to position (300, 200)." We ended up keeping the `description` string on each undo entry for the UI, which was good enough.
+
+## CRDTs: the theory is elegant, the practice is gnarly
+
+For multi-user collaboration, we went with CRDTs (Conflict-free Replicated Data Types). The pitch is compelling: every client maintains its own replica of the document, applies changes locally for instant feedback, and the CRDT algorithm guarantees that all replicas converge to the same state regardless of the order operations arrive. No central conflict resolution needed.
+
+We used Yjs specifically. It gives you shared types like `Y.Map`, `Y.Array`, and `Y.Text` that you wire up to your document model. When a user changes something, Yjs handles encoding the operation and merging remote operations.
+
+Here's roughly what our integration looked like:
+
+```typescript
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+
+const ydoc = new Y.Doc();
+const provider = new WebsocketProvider(
+  "wss://collab.example.com",
+  "doc-room-abc",
+  ydoc
+);
+
+const yElements = ydoc.getMap("elements");
+
+yElements.observe((event) => {
+  event.changes.keys.forEach((change, key) => {
+    if (change.action === "add") {
+      renderElement(key, yElements.get(key));
+    } else if (change.action === "update") {
+      updateElement(key, yElements.get(key));
+    } else if (change.action === "delete") {
+      removeElement(key);
+    }
+  });
+});
+
+function moveElement(id: string, x: number, y: number) {
+  const el = yElements.get(id) as Y.Map<any>;
+  ydoc.transact(() => {
+    el.set("x", x);
+    el.set("y", y);
+  });
+}
+```
+
+What nobody tells you about CRDTs: the conflict resolution is automatic, but the *results* of that resolution aren't always what a user expects. Two users move the same element to different positions — the CRDT resolves it deterministically, but one user's change just silently vanishes. There's no merge dialog, no notification. For text editing this is mostly fine (Yjs handles character-level merging beautifully). For spatial canvas operations? It can be confusing.
+
+We ended up adding an activity feed that shows recent changes from other users, partly as a collaboration feature but honestly also to make it less disorienting when your changes get overwritten.
+
+One thing that surprised me: the Yjs document size. CRDTs store tombstones — deleted items aren't really deleted, they're just marked as removed so that the merge algorithm works correctly. On a document that's been heavily edited over months, the CRDT state can balloon. We had a document hit 12MB of Yjs state for what was essentially a 200-element canvas. The fix was periodic compaction — snapshotting the current state and starting a fresh Yjs doc — but that requires careful coordination when multiple clients are connected.
+
+## Undo/redo + CRDTs = pain
+
+Here's a thing that seems like it should be straightforward but really isn't: undo/redo in a collaborative context.
+
+If I add an element and you move it, then I hit undo, what happens? Should my element disappear? Should your move be undone too? What if someone else has since added a child element inside mine?
+
+Yjs has its own undo manager (`Y.UndoManager`) that tracks local operations and can reverse them. It's aware of the CRDT structure, which helps, but it only undoes *your* changes. So in the scenario above, my undo removes the element I created, and your move becomes orphaned. The UndoManager handles this gracefully — the orphaned operations just become no-ops — but the user experience can still feel weird.
+
+```typescript
+const undoManager = new Y.UndoManager(yElements, {
+  trackedOrigins: new Set([ydoc.clientID]),
+});
+
+undoManager.on("stack-item-added", (event) => {
+  event.stackItem.meta.set("time", Date.now());
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey && e.key === "z") {
+    if (e.shiftKey) {
+      undoManager.redo();
+    } else {
+      undoManager.undo();
+    }
+  }
+});
+```
+
+I don't think there's a clean solution to collaborative undo. Every approach has tradeoffs. We went with "undo only affects your own actions" and it was… acceptable. Users occasionally got confused but not enough to warrant the complexity of a global undo system.
+
+## WebSocket sync and the things that go wrong
+
+We used WebSockets through `y-websocket` for the real-time transport layer. The basic setup is easy — the hard part is everything around it.
+
+Reconnection logic needs to handle all the edge cases. The connection drops, the client buffers local changes, reconnects, syncs the buffer. Sounds simple, but what if the client was offline for an hour and the document has diverged significantly? The Yjs sync protocol handles this (it exchanges state vectors to figure out what's missing), but the initial re-sync can be slow on large documents. We added a loading indicator specifically for this case because users thought the app was frozen.
+
+Presence (showing other users' cursors and selections) is a separate channel. We used Yjs awareness protocol for this:
+
+```typescript
+const awareness = provider.awareness;
+
+awareness.setLocalStateField("user", {
+  name: "Akin",
+  color: "#e06c75",
+  cursor: { x: 0, y: 0 },
+});
+
+awareness.on("change", () => {
+  const states = awareness.getStates();
+  renderCursors(states);
+});
+```
+
+Presence data is ephemeral — it doesn't persist and it doesn't go through the CRDT. It's broadcast separately and expires when a client disconnects. This is the right design, but it means you have two parallel data flows (document state and presence state) that can get out of sync. A user might see someone else's cursor on an element that, from their perspective, doesn't exist yet because the document update hasn't arrived. Small thing, but it makes the experience feel slightly off.
+
+## Performance with big documents
+
+A builder app's state tree gets big. Each element has position, size, style properties, data bindings, event handlers, children. Multiply that by hundreds of elements across multiple pages. Naively re-rendering the whole tree on every change kills performance.
+
+The obvious stuff helps: `React.memo` on canvas elements, virtualization for the layer panel and property inspector. But the less obvious optimization was structuring our state so that Yjs observe events only fire for the subtree that actually changed.
+
+```typescript
+const PageElements = memo(function PageElements({
+  pageId,
+}: {
+  pageId: string;
+}) {
+  const elements = useYMapSelector(
+    yElements,
+    pageId,
+    (map) => Array.from(map.entries()),
+    shallowEqual
+  );
+
+  return (
+    <CanvasLayer>
+      {elements.map(([id, data]) => (
+        <CanvasElement key={id} id={id} data={data} />
+      ))}
+    </CanvasLayer>
+  );
+});
+```
+
+We wrote a custom `useYMapSelector` hook that subscribes to a specific Yjs map and only triggers a re-render when the selected slice actually changes. It's similar to what `useSyncExternalStore` gives you, but adapted for Yjs observables. Getting the equality check right was important — we initially used deep equality and it was slower than just re-rendering.
+
+Another thing: batching drag operations. When a user drags an element across the canvas, you get a `mousemove` event every ~16ms. Broadcasting each one as a separate Yjs transaction is wasteful and creates a lot of CRDT operations. We throttled drag updates to 60ms intervals and only committed the final position on `mouseup`. The intermediate positions were local-only state. This cut our Yjs operation count during drags by about 75%.
+
+## The stuff I'd do differently
+
+If I were starting over, I'd think harder about the boundary between "local UI state" and "shared document state." We initially put too much into the CRDT — things like selection state, viewport position, panel sizes. None of that needs to be collaborative or undoable. Pulling it out simplified things a lot.
+
+I'd also evaluate whether a CRDT is even necessary for the use case. If your collaboration model is "only one person edits at a time" (like Google Docs' suggestion mode or a simple locking mechanism), operational transforms or even a last-write-wins approach might be simpler and perfectly adequate. CRDTs are powerful but they add real complexity — the tombstone growth, the undo semantics, the debugging difficulty (good luck inspecting a Yjs document's internal state).
+
+And I'd invest more in offline support from the beginning. CRDTs are theoretically great for offline — changes merge when you reconnect. But "theoretically great" and "actually works well in production" are different things. We bolted on IndexedDB persistence late and hit issues with stale tabs holding onto old document versions.
+
+This kind of state management isn't something you get right on the first pass. You make tradeoffs, hit walls, rethink your approach, and eventually arrive at something that works well enough. The patterns I described — Immer patches for undo, Yjs for collaboration, careful separation of local vs shared state — they're what survived contact with real users and real data. Your mileage will vary depending on your specific constraints, but hopefully this gives you a realistic picture of what you're signing up for.
