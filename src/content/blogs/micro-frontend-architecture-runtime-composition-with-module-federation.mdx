@@ -1,0 +1,407 @@
+---
+title: "Micro-Frontend Architecture: Runtime Composition with Module Federation"
+description: "How I've used Webpack Module Federation to split monolithic frontends into independently deployable apps — what worked, what didn't, and the sharp edges you'll hit."
+datetime: "2025-10-21"
+image: ""
+---
+
+I've worked on a few projects where the frontend codebase got big enough that deploys became a bottleneck. Three or four teams all touching the same repo, PRs blocking each other, and every release feeling like a coordination exercise. Micro-frontends kept coming up as the answer, and after trying a couple of approaches (iframe-based composition, build-time integration via npm packages), I landed on Webpack Module Federation for runtime composition. It's the approach I'd pick again, but it comes with real trade-offs that are worth understanding before you commit.
+
+## What Module Federation Actually Does
+
+The core idea is simple: you have multiple separately-built webpack applications, and one of them (the "host" or shell) can load code from the others (the "remotes") at runtime. No npm publish step, no rebuilding the shell when a remote changes. Each app gets built and deployed on its own, and the shell pulls in whatever version is currently live.
+
+Here's what the webpack config looks like on the remote side — say you have a product catalog app:
+
+```javascript
+// webpack.config.js — product catalog remote
+const { ModuleFederationPlugin } = require("webpack").container;
+
+module.exports = {
+  output: {
+    publicPath: "auto",
+  },
+  plugins: [
+    new ModuleFederationPlugin({
+      name: "productApp",
+      filename: "remoteEntry.js",
+      exposes: {
+        "./ProductList": "./src/components/ProductList",
+        "./ProductDetail": "./src/components/ProductDetail",
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+      },
+    }),
+  ],
+};
+```
+
+And on the host:
+
+```javascript
+// webpack.config.js — shell application
+const { ModuleFederationPlugin } = require("webpack").container;
+
+module.exports = {
+  plugins: [
+    new ModuleFederationPlugin({
+      name: "shell",
+      remotes: {
+        productApp: "productApp@https://products.cdn.example.com/remoteEntry.js",
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+      },
+    }),
+  ],
+};
+```
+
+A couple things to note: I use `publicPath: "auto"` on remotes instead of hardcoding a URL. This makes the remote figure out its own public path at runtime based on where `remoteEntry.js` was loaded from, which is way less fragile when you have multiple environments (staging, production, preview deploys). Hardcoding `http://localhost:3001/` in examples is fine for a demo, but you'll regret it immediately in any real setup.
+
+## Loading Remote Components
+
+On the host side, you consume remote modules with dynamic imports. React.lazy works well here:
+
+```tsx
+import React, { Suspense } from "react";
+
+const ProductList = React.lazy(() => import("productApp/ProductList"));
+
+function MarketplacePage() {
+  return (
+    <Suspense fallback={<ProductListSkeleton />}>
+      <ProductList onAddToCart={handleAddToCart} />
+    </Suspense>
+  );
+}
+```
+
+I personally prefer giving `Suspense` a proper skeleton component rather than a generic spinner. Users see the remote chunk load as a normal page render instead of a loading state flash, and it makes the micro-frontend boundary invisible to them — which is the whole point.
+
+One thing that bit me: the dynamic import `import("productApp/ProductList")` relies on the remote's `remoteEntry.js` being loaded first. Webpack handles this automatically if you use the static `remotes` config, but if you're doing dynamic remote loading (deciding which URL to load at runtime), you need to handle the script injection yourself. I'll get to that.
+
+### Error Boundaries Are Non-Negotiable
+
+Remote modules load over the network. The CDN goes down, someone deploys a broken build, the user's connection drops mid-chunk — whatever the reason, you need error boundaries around every remote component. Not optional, not "nice to have."
+
+```tsx
+import React, { Component, type ReactNode, type ErrorInfo } from "react";
+
+interface Props {
+  children: ReactNode;
+  fallback: ReactNode;
+  onError?: (error: Error, info: ErrorInfo) => void;
+}
+
+interface State {
+  hasError: boolean;
+}
+
+class RemoteBoundary extends Component<Props, State> {
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    this.props.onError?.(error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+```
+
+I wire the `onError` callback into whatever error tracking we're using (Sentry, usually). The fallback should ideally give the user something useful — a retry button, a link to the standalone version of the app, anything other than "Something went wrong."
+
+## Dynamic Remotes
+
+Static remote URLs in the webpack config work fine if you know all your remotes ahead of time. But in larger setups, you might want to decide at runtime which remotes to load and from where. Maybe you're running A/B tests with different versions of a remote, or you have a config service that tells the shell which micro-frontends are available.
+
+Here's the pattern I've used:
+
+```typescript
+type RemoteScope = Record<string, { get: (module: string) => Promise<() => any> }>;
+
+async function loadRemote(
+  remoteName: string,
+  remoteUrl: string
+): Promise<void> {
+  const element = document.createElement("script");
+  element.src = remoteUrl;
+  element.type = "text/javascript";
+  element.async = true;
+
+  return new Promise((resolve, reject) => {
+    element.onload = () => {
+      const scope = (window as unknown as RemoteScope)[remoteName];
+      if (!scope) {
+        reject(new Error(`Remote ${remoteName} not found on window`));
+        return;
+      }
+      resolve();
+    };
+    element.onerror = () =>
+      reject(new Error(`Failed to load remote: ${remoteUrl}`));
+    document.head.appendChild(element);
+  });
+}
+
+async function loadRemoteComponent(remoteName: string, moduleName: string) {
+  const scope = (window as unknown as RemoteScope)[remoteName];
+  const factory = await scope.get(moduleName);
+  return factory();
+}
+```
+
+This is honestly kind of ugly — you're dealing with script tags and global variables. But it works, and it gives you full control over when and where remotes come from. You can pair it with a manifest file that your shell fetches on startup:
+
+```json
+{
+  "productApp": "https://products.cdn.example.com/v2.3.1/remoteEntry.js",
+  "cartApp": "https://cart.cdn.example.com/v1.8.0/remoteEntry.js",
+  "accountApp": "https://account.cdn.example.com/v3.0.0/remoteEntry.js"
+}
+```
+
+This decouples your deploy pipeline nicely — update the manifest, and the shell picks up the new version on next page load without redeploying itself.
+
+## The Shared Dependencies Problem
+
+This is where most of the pain lives. Module Federation's `shared` config is powerful but has sharp edges.
+
+When you mark `react` as a singleton, you're telling webpack: "only load one copy of this, even if the host and remotes specify different versions." That's what you want — two copies of React on the same page means broken hooks, broken context, broken everything. But `singleton: true` alone isn't enough. You should also set `requiredVersion` and consider `strictVersion`:
+
+```javascript
+shared: {
+  react: {
+    singleton: true,
+    requiredVersion: "^18.2.0",
+    strictVersion: false,
+  },
+  "react-dom": {
+    singleton: true,
+    requiredVersion: "^18.2.0",
+    strictVersion: false,
+  },
+  "react-router-dom": {
+    singleton: true,
+    requiredVersion: "^6.20.0",
+  },
+}
+```
+
+`strictVersion: false` is the default and means webpack will warn in the console if versions don't match but still use whatever version is available. Setting it to `true` throws an error instead. I keep it `false` for most things because a minor version mismatch on React usually isn't a problem, and I'd rather have a working app with a console warning than a crashed app.
+
+The part that surprised me: shared dependencies affect your initial bundle size and load time more than you'd expect. Webpack has to resolve which version to use at runtime through a negotiation protocol, and that resolution happens before your app renders. If you share too many packages, you'll notice a delay on cold loads. I try to keep the shared list minimal — React, ReactDOM, the router, and maybe a shared component library. Everything else can be duplicated across remotes; the extra bundle size is usually smaller than the performance cost of sharing.
+
+## Routing
+
+Routing in a micro-frontend setup is one of those things that seems simple until you actually implement it. The shell owns the top-level routes and delegates to remotes for sub-routes.
+
+```tsx
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import React, { Suspense } from "react";
+
+const ProductRoutes = React.lazy(() => import("productApp/Routes"));
+const CartRoutes = React.lazy(() => import("cartApp/Routes"));
+const AccountRoutes = React.lazy(() => import("accountApp/Routes"));
+
+function App() {
+  return (
+    <BrowserRouter>
+      <ShellLayout>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route
+            path="/products/*"
+            element={
+              <Suspense fallback={<PageSkeleton />}>
+                <ProductRoutes />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/cart/*"
+            element={
+              <Suspense fallback={<PageSkeleton />}>
+                <CartRoutes />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/account/*"
+            element={
+              <Suspense fallback={<PageSkeleton />}>
+                <AccountRoutes />
+              </Suspense>
+            }
+          />
+        </Routes>
+      </ShellLayout>
+    </BrowserRouter>
+  );
+}
+```
+
+The `/*` wildcard on the path is important — it lets the remote handle nested routing under that prefix. Inside the remote, routes are relative:
+
+```tsx
+// Inside productApp/Routes
+import { Routes, Route } from "react-router-dom";
+
+export default function ProductRoutes() {
+  return (
+    <Routes>
+      <Route index element={<ProductList />} />
+      <Route path=":id" element={<ProductDetail />} />
+      <Route path=":id/reviews" element={<ProductReviews />} />
+    </Routes>
+  );
+}
+```
+
+The key constraint: `react-router-dom` must be shared as a singleton. If the shell and the remote each have their own router instance, they won't share the same history or location state, and navigation between micro-frontends will break in confusing ways (the URL updates but the page doesn't, or vice versa).
+
+## Cross-App Communication
+
+I've tried a few approaches here and I honestly think the simplest one is the best: custom events on the window. No library, no shared state management, just browser-native CustomEvent.
+
+```typescript
+// Shared types (published as a small internal package or just copy-pasted)
+interface CartUpdateEvent {
+  productId: string;
+  quantity: number;
+}
+
+// Dispatching from the product app
+function addToCart(productId: string, quantity: number) {
+  window.dispatchEvent(
+    new CustomEvent<CartUpdateEvent>("cart:add", {
+      detail: { productId, quantity },
+    })
+  );
+}
+
+// Listening in the cart app
+useEffect(() => {
+  function handleCartAdd(e: CustomEvent<CartUpdateEvent>) {
+    dispatch({ type: "ADD_ITEM", payload: e.detail });
+  }
+
+  window.addEventListener("cart:add", handleCartAdd as EventListener);
+  return () =>
+    window.removeEventListener("cart:add", handleCartAdd as EventListener);
+}, []);
+```
+
+I know people build custom EventEmitter classes or reach for state management solutions shared across remotes. I've done the custom EventEmitter thing, and it's fine, but you're essentially reimplementing what the browser already gives you. CustomEvent works everywhere, it's debuggable in DevTools, and it keeps the coupling between apps to just an event name and a payload shape.
+
+For more complex state that needs to be shared (authenticated user info, feature flags, theme preference), I pass it down from the shell via props or React context. The shell owns that state, the remotes consume it.
+
+## Styling: Keep It Isolated
+
+CSS conflicts across micro-frontends are a real source of bugs, and they're annoying to debug because the symptoms are visual and often subtle — a button that's the wrong shade of blue, padding that's off by 4px.
+
+I personally prefer CSS Modules for micro-frontend projects. Each remote's styles are scoped by default, and you don't need any runtime overhead:
+
+```css
+/* ProductCard.module.css */
+.card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+```
+
+```tsx
+import styles from "./ProductCard.module.css";
+
+function ProductCard({ product }: { product: Product }) {
+  return (
+    <div className={styles.card}>
+      <h3 className={styles.title}>{product.name}</h3>
+      <p>{product.description}</p>
+    </div>
+  );
+}
+```
+
+Tailwind also works if you prefix each remote's classes (Tailwind's `prefix` option). Without prefixes, you'll get class collisions between remotes — `bg-blue-500` means the same thing everywhere, but if two remotes load slightly different Tailwind builds, you'll get inconsistent results.
+
+One gotcha: be very careful with global CSS resets. If the shell loads a reset and a remote also loads one, you might get double-reset issues or specificity conflicts. Keep global styles in the shell only, and have remotes assume they're running inside a normalized environment.
+
+## Independent Deploys
+
+This is the whole reason you're doing this, so the CI/CD pipeline per remote matters. Here's roughly what ours looks like:
+
+```yaml
+name: Deploy Product App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/product-app/**"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+        working-directory: apps/product-app
+      - run: npm test -- --passWithNoTests
+        working-directory: apps/product-app
+      - run: npm run build
+        working-directory: apps/product-app
+      - name: Upload to CDN
+        run: |
+          aws s3 sync apps/product-app/dist/ s3://${{ secrets.CDN_BUCKET }}/product-app/ \
+            --cache-control "public, max-age=31536000, immutable"
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CF_DIST_ID }} \
+            --paths "/product-app/remoteEntry.js"
+```
+
+Notice the cache invalidation only targets `remoteEntry.js`. The actual chunks are content-hashed and can be cached aggressively. The `remoteEntry.js` file is the manifest that tells the host where to find the current chunks, so that's the only file that needs to be "fresh."
+
+The `paths` filter is important if you're using a monorepo — you don't want to rebuild and redeploy the product app when someone changes the cart app.
+
+## When This Is Overkill
+
+I want to be honest about this: most projects don't need micro-frontends. If you have fewer than 3 teams working on the frontend, or your app isn't big enough that deploys are a bottleneck, you're adding complexity for no real benefit.
+
+A monorepo with good code ownership rules (CODEOWNERS file, protected paths in CI) and feature flags gives you most of the autonomy benefits without the runtime overhead. I've seen teams adopt micro-frontends because they read about it in a blog post (like this one, I suppose) and then spend months dealing with shared dependency issues that wouldn't exist in a single app.
+
+The honest checklist: do you have multiple teams that need to deploy on different cadences? Is the frontend big enough that build times are painful? Do you have the infrastructure to support multiple CDN deployments and monitoring per remote? If you said no to any of these, stick with a well-structured monolith.
+
+## Real Gotchas I've Hit
+
+**Shared dependency version drift.** One remote upgrades to React 18.3, another stays on 18.2. The singleton mechanism picks one version at runtime (usually the first one loaded), and the console fills with warnings. This isn't usually a breaking issue within a minor version, but it's noise that masks real problems. We enforce versions through a shared `package.json` constraint at the monorepo root and a CI check that fails if any remote's React version doesn't match.
+
+**`remoteEntry.js` caching.** If your CDN caches `remoteEntry.js` aggressively, users will keep loading stale versions of your remotes even after a deploy. Set `Cache-Control: no-cache` or a short `max-age` on `remoteEntry.js` specifically. Everything else can be immutable.
+
+**TypeScript types across boundaries.** The remote exposes a component, but how does the host know what props it accepts? There's no built-in type sharing in Module Federation. We publish a small `@internal/product-app-types` package from each remote that just exports the prop interfaces. It's manual and slightly annoying, but it catches breaking changes at compile time instead of runtime.
+
+**Dev environment complexity.** Running the full micro-frontend setup locally means starting 4+ webpack dev servers. We use a `docker-compose.yml` that starts everything, but it's slow and memory-hungry. For day-to-day work, most developers run only the shell and their own remote, with other remotes pointing at the staging CDN. This works but occasionally leads to "works on my machine" issues when local code interacts with stale staging remotes.
+
+**Initial load performance.** The shell needs to fetch `remoteEntry.js` for every remote before it can render those sections. On slow connections, this adds noticeable latency. Prefetching the entry points (`<link rel="prefetch">` in the shell's HTML) helps, as does keeping the number of remotes that load on the initial page small. Not every remote needs to load on the landing page.
