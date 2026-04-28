@@ -1,36 +1,26 @@
 ---
 title: "Multi-Team Codebase Management in a Monorepo: Governance with Nx and Turborepo"
-description: "Navigate the complex world of managing a large frontend monorepo shared by multiple teams using Nx and Turborepo, focusing on code ownership, dependency management, CI optimization, and governance strategies."
+description: "What I learned managing a large frontend monorepo across multiple teams — code ownership, CI that doesn't take forever, and the stuff nobody warns you about."
 datetime: "2025-10-18"
 image: ""
 ---
 
-I remember the time when my team and I were drowning in a sea of repositories. Each new feature or bug fix required us to jump between multiple codebases, and keeping dependencies in sync was a never-ending task. Frustration levels were high as our CI pipeline slowed to a crawl, eventually leading us to the lightbulb moment: we needed to consolidate everything into a monorepo. Managing multiple teams in a gigantic frontend codebase isn't for the faint-hearted, but tools like Nx and Turborepo can take a lot of the sting out of the process. In this piece, I'll walk you through how we navigated this transformation, encountered pitfalls, and found solutions.
+At some point last year, I was spending more time coordinating dependency versions across six repos than writing actual code. Our team would bump a shared UI library in repo A, then spend the rest of the sprint chasing down broken builds in repos B through F. The final straw was a Thursday afternoon where three teams shipped conflicting versions of our design token package to production. That's when we decided to go monorepo.
 
-## Understanding Nx and Turborepo
+I want to be upfront: monorepos don't magically solve coordination problems. They just trade one set of problems for a different (in my opinion, more manageable) set. Here's what that actually looked like for us.
 
-Choosing between Nx and Turborepo is akin to picking between two highly talented technicians with slightly different specialties. Both can manage our requirement of a multi-team monorepo effectively, but their differences influence their suitability based on specific needs.
+## Nx vs Turborepo — the honest comparison
 
-### Nx Architecture and Mechanics
+I've used both on real projects now, and the short version is: they're solving the same problem with different philosophies.
 
-Nx is more than just a task runner; it's an opinionated framework suited to help with Lerna-esque monorepo management and beyond. It provides an intricate plugin system that allows for rich, integrated tooling within the monorepo ecosystem.
+**Nx** is a full framework. It has opinions about how your code should be structured, it ships generators for scaffolding, and its plugin ecosystem covers everything from React to Go. The dependency graph analysis is genuinely great — you can run `nx affected:test` and it'll figure out which projects were touched by your changes and only test those. When you have 40+ packages, this matters a lot.
 
-Nx uses the affected graph, which lets you run a task only on the projects affected by changes. As an example:
-
-```bash
-nx affected:test
-```
-
-This command ensures you only run tests in projects that have been altered or impacted by your current branch changes.
-
-### Turborepo Task Orchestration
-
-On the other hand, Turborepo focuses heavily on performance with its zero-config task interleaving, and it does wonders with its caching philosophy. Turborepo automatically re-uses the build results from previous runs where applicable, seeing such effects take build times from over an hour down to mere minutes.
+**Turborepo** is deliberately minimal. It's a task runner with excellent caching, and it stays out of your way otherwise. The configuration is dead simple:
 
 ```json
 // turbo.json
 {
-  "pipeline": {
+  "tasks": {
     "lint": {},
     "build": {
       "dependsOn": ["^build"]
@@ -42,71 +32,101 @@ On the other hand, Turborepo focuses heavily on performance with its zero-config
 }
 ```
 
-Creating a pipeline like this allows Turborepo to know exactly which tasks depend on which outcomes, making it an efficient CI ally.
+That `^build` syntax means "build my dependencies first." That's basically the entire mental model. You define your task graph, Turborepo parallelizes everything it can, and caching handles the rest.
 
-## Governance with Code Ownership
+I personally prefer Turborepo for teams that already have their own tooling opinions and just need fast orchestration. If you're starting from scratch or want more guardrails, Nx gives you more structure — but that structure can feel heavy if your team already has strong conventions.
 
-In a large monorepo shared by multiple teams, governance is critical. Enforcing code ownership is essential to ensure smooth collaboration. Here's how CODEOWNERS files can be structured:
+One thing that surprised me: Nx's `affected` analysis is noticeably smarter than Turborepo's out of the box. Nx actually understands import relationships between packages, while Turborepo relies more on file change detection within package boundaries. For a monorepo with lots of cross-package imports, this difference is real.
+
+## Code ownership — get this right early
+
+CODEOWNERS was the single most impactful thing we set up, and we should have done it on day one instead of week six.
 
 ```plaintext
 # CODEOWNERS
-/frontend/team-a/ @frontend-team-a
-/frontend/team-b/ @frontend-team-b
+/packages/ui-components/    @frontend-platform
+/packages/checkout-flow/    @commerce-team
+/packages/auth/             @identity-team
+/apps/dashboard/            @frontend-platform @commerce-team
+/packages/shared-utils/     @frontend-platform
 ```
 
-By defining which team is responsible for what, we encountered fewer review bottlenecks and more accountability. However, one early mistake was insufficiently granular ownership definitions, which led to cross-team code bloat. We had to split directories further to enforce more focused boundaries.
+The trick is granularity. Our first attempt was too broad — we had `/packages/ @frontend-team` and that meant every PR touching any package needed a review from the same group. That bottleneck got ugly fast. We ended up splitting ownership down to the package level, and for some packages, down to specific directories within them.
 
-## Running Affected Commands and Dependency Graph Analysis
+The annoying part is maintaining CODEOWNERS as your monorepo grows. New packages get created, teams reorganize, people leave. We added a CI check that fails if a new directory under `/packages/` doesn't have a CODEOWNERS entry. Crude, but effective.
 
-The ability to execute affected commands is essential for streamlining development and CI pipelines. Nx's dependency graph visualization helped us better understand inter-package dependencies, enforcing module boundaries that once seemed porous.
+There's also the political side nobody talks about in blog posts. When you put `@commerce-team` as owner of `/packages/checkout-flow/`, you're saying they have veto power over changes there. That's great until the platform team needs to do a breaking refactor across 15 packages and every team has to approve their slice. We handle this with an `@architecture` group that can override for cross-cutting changes, but it took a few painful PRs sitting open for days before we formalized that.
 
-```bash
-nx affected:dep-graph
+## The dependency graph will humble you
+
+Run `nx graph` (or `nx affected:dep-graph` if you want to scope it) on any monorepo that's been around for more than a few months. I guarantee you'll find at least one dependency cycle you didn't know about, and at least three packages depending on things they have no business importing.
+
+We found our checkout package importing a test utility from the dashboard app. Not a shared test util package — the actual dashboard app's test helpers. Someone had done it because the import path worked and it was faster than extracting those utils into a shared package. In a multi-repo world this would've been impossible. In a monorepo, the import just... works. That's both the superpower and the footgun.
+
+Nx has module boundary rules that can enforce constraints:
+
+```json
+// nx.json or project-level config
+{
+  "tags": ["scope:checkout", "type:feature"],
+  "implicitDependencies": []
+}
 ```
 
-Visualizing these relationships brought to light unexpected dependencies and helped enforce clearer boundaries.
+You tag projects and then write lint rules like "projects tagged `scope:checkout` can only import from projects tagged `scope:shared`." This is honestly annoying to set up, and people will complain about it. Do it anyway. The alternative is a dependency graph that looks like a plate of spaghetti within six months.
 
-## Optimizing CI with Task Execution and Caching
+Turborepo doesn't have this built in, which is one of the areas where Nx genuinely has an advantage. You can sort of replicate it with TypeScript project references and path restrictions, but it's more manual.
 
-CI pipelines traditionally slow down significantly in a monorepo setup. Both Nx and Turborepo offer remote caching capabilities to help mitigate these issues.
+## CI caching — the thing that actually saves your sanity
 
-In Turborepo, enabling remote caching is straightforward:
+Before remote caching, our CI was running 35 minutes on every PR. After enabling it, most PRs finish in 4-7 minutes. That's not an exaggeration — when 80% of your packages haven't changed, caching skips all of their build/test/lint steps entirely.
+
+Both Nx (via Nx Cloud) and Turborepo (via Vercel Remote Cache, or self-hosted) support remote caching. The concept is the same: hash the inputs to a task (source files, dependencies, environment), check if that hash exists in the cache, and if so, replay the outputs instead of running the task again.
+
+Here's the gotcha that cost us a full day of debugging: cache key composition. We had an environment variable (`API_URL`) that differed between staging and production builds. We forgot to include it in the cache key inputs. So CI would cache a staging build, then a production deploy would get the cached staging build because the source files hadn't changed. The app worked fine — it just pointed at the wrong API. Nobody noticed until QA flagged it.
+
+The fix in Turborepo:
 
 ```json
 {
-  "cache": {
-    "remoteCache": {
-      "enabled": true,
-      "endpoint": "https://my-cache-service"
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": ["API_URL", "NODE_ENV"],
+      "outputs": ["dist/**"]
     }
   }
 }
 ```
 
-This setup reduced our average CI time from 20 minutes to around 5, thanks to the effective re-use of cached results.
+That `env` array tells Turborepo to include those variables in the cache hash. Miss one and you'll get builds that are technically correct but functionally wrong. I'd recommend being aggressive about listing env vars here, even if it means slightly more cache misses.
 
-A misstep to be aware of is cache invalidation issues. We experienced an incident where stale data was served due to a misconfiguration in cache keys, leading to a day of debugging erroneous UI behavior.
+## Workspace conventions — boring but necessary
 
-## Workspace Conventions and Versioning Strategy
+With five teams contributing to the same repo, you need shared configs or things diverge fast. We have a `packages/config-eslint` and `packages/config-typescript` that every other package extends. When we want to change a lint rule, it's one PR instead of six.
 
-Setting standards is fundamental in a multi-team setup. Naming conventions and shared configuration files like ESLint, TypeScript, and Prettier are essential to maintaining homogeneity.
+The versioning question is interesting. We went with fixed versioning (all packages share one version number) because independent versioning was a nightmare in our previous multi-repo setup — teams would pin transitive dependencies and you'd end up with three different versions of the same internal package in one app bundle.
 
-For versioning, we had to decide between independent and fixed versioning. After a long debate, we went with fixed versioning due to its simplicity in synchronizing releases and avoiding the cascading dependency updates that plagued our previous multi-repo strategy.
+Fixed versioning is simpler, but the tradeoff is that bumping a version means releasing everything, even packages that didn't change. For us, that's acceptable. If you're publishing packages to npm for external consumption, independent versioning probably makes more sense. It depends on your situation.
 
-## Migrating from Multi-Repo to Monorepo
+## The migration itself
 
-Moving from multiple repositories to a monorepo was our biggest challenge. Maintaining git history was critical, and tools like `git subtree` helped preserve this during our migration.
+Moving six repos into one monorepo took us about three weeks of focused work, and I'd budget more if your repos have longer histories.
 
-The pitfall here was the unexpected increase in complexity when merging divergent histories, which initially created a tangled mess. It took a dedicated effort to rewrite portions of history to bring everything into alignment.
+We used `git subtree add` to bring each repo in with its history preserved. The command looks roughly like:
 
-## Lessons Learned
+```bash
+git subtree add --prefix=packages/checkout https://github.com/org/checkout-repo.git main
+```
 
-Here are some key takeaways from our journey:
+This worked, but the resulting git history is messy. `git log` shows interleaved commits from all the original repos, and `git blame` sometimes points to the subtree merge commit instead of the original author. It's livable, but don't expect a clean linear history.
 
-- **Governance**: Clear code ownership with CODEOWNERS was crucial for cross-team collaboration.
-- **CI Efficiency**: Remote caching and understanding dependency graphs can drastically reduce build times and increase throughput.
-- **Error Handling**: Stay vigilant with cache invalidation to avoid incorrect data serving.
-- **Standardization**: Enforce workspace conventions to avoid chaos in a multi-team setup.
-- **Thoughtful Migration**: Preserve git history when transitioning to avoid losing vital information.
+The part that took the longest wasn't the git mechanics — it was fixing all the import paths, build configurations, and CI pipelines. Every repo had slightly different TypeScript configs, different test setups, different ways of handling environment variables. Normalizing all of that is tedious work that you can't really automate away.
 
-Thanks for reading. If you found this useful or have questions, feel free to reach out — I always enjoy talking architecture. See you in the next one.
+My advice: do the migration in phases. We moved two packages first, got CI working, let teams adjust for a week, then brought in the rest. Trying to do it all at once would have been chaos.
+
+## What I'd do differently
+
+If I were starting over, I'd set up module boundary rules from day one instead of retrofitting them. I'd also invest more time in the `CODEOWNERS` structure before inviting all teams into the repo. And I'd write documentation for the monorepo-specific workflows (how to create a new package, how to add a dependency between packages, how caching works) because people will ask the same questions over and over.
+
+Monorepos aren't inherently better than multi-repo setups. They're better for us because our packages are tightly coupled and our teams need to move fast on shared code. If your packages are genuinely independent, a monorepo might just add overhead. But if you're spending your days fighting version conflicts and waiting for cross-repo PRs to land — yeah, it's probably worth it.
